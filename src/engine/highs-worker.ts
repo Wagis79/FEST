@@ -1,0 +1,124 @@
+/**
+ * HiGHS Worker Process
+ * 
+ * Körs som separat process för att isolera WASM-krascher.
+ * Kommunicerar via stdin/stdout med JSON-meddelanden.
+ * 
+ * Användning:
+ *   node --loader tsx highs-worker.ts
+ *   
+ * Input (JSON på stdin):
+ *   { "type": "solve", "lp": "Minimize\n obj: ..." }
+ *   
+ * Output (JSON på stdout):
+ *   { "type": "result", "status": "Optimal", "columns": {...} }
+ *   { "type": "error", "message": "..." }
+ */
+
+import * as readline from 'readline';
+
+interface SolveRequest {
+  type: 'solve';
+  lp: string;
+  id?: string;
+}
+
+interface SolveResponse {
+  type: 'result' | 'error';
+  id?: string;
+  status?: string;
+  columns?: Record<string, { Primal: number }>;
+  objectiveValue?: number;
+  message?: string;
+}
+
+let highs: any = null;
+let solveCount = 0;
+const MAX_SOLVES_BEFORE_EXIT = 3; // Avsluta efter 3 solves - balans mellan stabilitet och 3 strategier
+
+async function initHiGHS(): Promise<void> {
+  if (highs) return;
+  
+  try {
+    const highsModule = await import('highs');
+    const loader = highsModule.default || highsModule;
+    highs = await loader({});
+    console.error('[worker] HiGHS initialized'); // stderr för debug
+  } catch (e: any) {
+    console.error('[worker] Failed to init HiGHS:', e.message);
+    process.exit(1);
+  }
+}
+
+function solve(lp: string): SolveResponse {
+  try {
+    const result = highs.solve(lp);
+    solveCount++;
+    
+    return {
+      type: 'result',
+      status: result.Status,
+      columns: result.Columns,
+      objectiveValue: result.ObjectiveValue,
+    };
+  } catch (e: any) {
+    return {
+      type: 'error',
+      message: e.message || String(e),
+    };
+  }
+}
+
+async function main(): Promise<void> {
+  await initHiGHS();
+  
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+    terminal: false,
+  });
+  
+  rl.on('line', (line: string) => {
+    try {
+      const request: SolveRequest = JSON.parse(line);
+      
+      if (request.type === 'solve') {
+        const response = solve(request.lp);
+        response.id = request.id;
+        
+        // Skicka svar på stdout
+        console.log(JSON.stringify(response));
+        
+        // Avsluta om vi nått gränsen
+        if (solveCount >= MAX_SOLVES_BEFORE_EXIT) {
+          console.error(`[worker] Reached ${MAX_SOLVES_BEFORE_EXIT} solves, exiting for memory cleanup`);
+          process.exit(0);
+        }
+      }
+    } catch (e: any) {
+      const errorResponse: SolveResponse = {
+        type: 'error',
+        message: `Parse error: ${e.message}`,
+      };
+      console.log(JSON.stringify(errorResponse));
+    }
+  });
+  
+  rl.on('close', () => {
+    console.error('[worker] stdin closed, exiting');
+    process.exit(0);
+  });
+  
+  // Hantera SIGTERM gracefully
+  process.on('SIGTERM', () => {
+    console.error('[worker] SIGTERM received, exiting');
+    process.exit(0);
+  });
+  
+  console.error('[worker] Ready for requests');
+}
+
+main().catch((e) => {
+  console.error('[worker] Fatal error:', e);
+  process.exit(1);
+});

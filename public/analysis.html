@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Produktanalys - Näringskostnader | FEST Admin</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            background: white;
+            border-radius: 12px;
+            padding: 20px 30px;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .header-left h1 {
+            color: #333;
+            font-size: 1.5rem;
+            margin: 0;
+        }
+
+        .header-nav {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            background: #f5f5f5;
+            padding: 4px;
+            border-radius: 10px;
+        }
+
+        .header-nav a {
+            text-decoration: none;
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-weight: 500;
+            font-size: 0.85rem;
+            color: #666;
+            transition: all 0.2s;
+        }
+
+        .header-nav a:hover {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .header-nav a.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #666;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        /* Main Content */
+        .main-content {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .section-header {
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .section-header h2 {
+            color: #333;
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+        }
+
+        .section-header p {
+            color: #666;
+            font-size: 0.95rem;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 24px;
+            margin-bottom: 35px;
+        }
+
+        @media (max-width: 1200px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 600px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 16px;
+            padding: 28px 24px;
+            color: white;
+            box-shadow: 0 6px 16px rgba(102, 126, 234, 0.3);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .stat-card h3 {
+            font-size: 0.85rem;
+            font-weight: 600;
+            opacity: 0.9;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-card .value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 6px;
+            line-height: 1.1;
+        }
+
+        .stat-card .label {
+            font-size: 0.85rem;
+            opacity: 0.75;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            background: transparent;
+            border: none;
+            color: #666;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab:hover {
+            color: #667eea;
+        }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Table */
+        .table-container {
+            overflow-x: auto;
+            margin-top: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.95rem;
+        }
+
+        thead {
+            background: #f8f9fa;
+        }
+
+        th {
+            padding: 12px 16px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+            border-bottom: 2px solid #e0e0e0;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        th:hover {
+            background: #e8e9ea;
+        }
+
+        th .sort-icon {
+            font-size: 0.7rem;
+            margin-left: 5px;
+            opacity: 0.5;
+        }
+
+        th.sorted .sort-icon {
+            opacity: 1;
+        }
+
+        td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        .product-name {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .nutrient-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-right: 4px;
+        }
+
+        .nutrient-N { background: #e3f2fd; color: #1976d2; }
+        .nutrient-P { background: #fff3e0; color: #f57c00; }
+        .nutrient-K { background: #f3e5f5; color: #7b1fa2; }
+        .nutrient-S { background: #e8f5e9; color: #388e3c; }
+
+        .cost-cell {
+            font-weight: 600;
+            padding: 8px 16px;
+            border-radius: 6px;
+        }
+
+        .cost-cheap {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .cost-medium {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        .cost-expensive {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .cost-na {
+            color: #999;
+            font-style: italic;
+        }
+
+        /* Cheapest Sources Cards */
+        .cheapest-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 25px;
+            margin-top: 25px;
+        }
+
+        .cheapest-card {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.2s;
+        }
+
+        .cheapest-card:hover {
+            border-color: #667eea;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+        }
+
+        .cheapest-card h3 {
+            font-size: 1.3rem;
+            margin-bottom: 15px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nutrient-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .icon-N { background: #e3f2fd; color: #1976d2; }
+        .icon-P { background: #fff3e0; color: #f57c00; }
+        .icon-K { background: #f3e5f5; color: #7b1fa2; }
+        .icon-S { background: #e8f5e9; color: #388e3c; }
+
+        .product-list {
+            list-style: none;
+        }
+
+        .product-item {
+            padding: 12px 0;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .product-item:last-child {
+            border-bottom: none;
+        }
+
+        .product-item-name {
+            font-weight: 600;
+            color: #333;
+            flex: 1;
+        }
+
+        .product-item-cost {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: #667eea;
+        }
+
+        .product-item-rank {
+            background: #667eea;
+            color: white;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.9rem;
+            margin-right: 12px;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 60px;
+            color: #666;
+        }
+
+        .loading-spinner {
+            border: 4px solid #f0f0f0;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Error */
+        .error {
+            background: #ffebee;
+            border: 2px solid #ef5350;
+            border-radius: 12px;
+            padding: 30px;
+            color: #c62828;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .error h3 {
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+
+        .error a {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 12px 30px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .error a:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-left">
+                <h1>� FEST Admin</h1>
+                <nav class="header-nav">
+                    <a href="/admin.html">🏠 Översikt</a>
+                    <a href="/admin-products.html">📦 Produkter</a>
+                    <a href="/admin-crops.html">🌾 Grödor</a>
+                    <a href="/analysis.html" class="active">📊 Analys</a>
+                </nav>
+            </div>
+            <div class="header-right">
+                <a href="/" class="btn btn-secondary">🌾 Till FEST</a>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="section-header">
+                <h2>Näringskostnad per produkt</h2>
+                <p>Analysera vad varje näringsämne kostar i olika produkter för att förstå prisoptimeringen</p>
+            </div>
+
+            <!-- Loading State -->
+            <div id="loading" class="loading">
+                <div class="loading-spinner"></div>
+                <p>Laddar produktanalys...</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="error" class="error" style="display: none;">
+                <h3>⚠️ Ett fel uppstod</h3>
+                <p id="error-message"></p>
+            </div>
+
+            <!-- Stats Grid -->
+            <div id="stats" style="display: none;">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>🌿 Billigaste N-källa</h3>
+                        <div class="value" id="stat-cheapest-n">-</div>
+                        <div class="label" id="stat-cheapest-n-product">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>🔬 Billigaste P-källa</h3>
+                        <div class="value" id="stat-cheapest-p">-</div>
+                        <div class="label" id="stat-cheapest-p-product">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>⚡ Billigaste K-källa</h3>
+                        <div class="value" id="stat-cheapest-k">-</div>
+                        <div class="label" id="stat-cheapest-k-product">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>📊 Produktöversikt</h3>
+                        <div class="value" id="stat-total">0</div>
+                        <div class="label" id="stat-price-range">-</div>
+                    </div>
+                </div>
+
+                <!-- Tabs -->
+                <div class="tabs">
+                    <button class="tab active" data-tab="all">Alla produkter</button>
+                    <button class="tab" data-tab="cheapest">Billigaste källor</button>
+                </div>
+
+                <!-- Tab Content: All Products -->
+                <div id="tab-all" class="tab-content active">
+                    <div class="table-container">
+                        <table id="products-table">
+                            <thead>
+                                <tr>
+                                    <th data-sort="name">Produkt <span class="sort-icon">▼</span></th>
+                                    <th data-sort="price">Pris/kg <span class="sort-icon">▼</span></th>
+                                    <th>Näringsämnen</th>
+                                    <th data-sort="costN">N-kostnad (kr/kg) <span class="sort-icon">▼</span></th>
+                                    <th data-sort="costP">P-kostnad (kr/kg) <span class="sort-icon">▼</span></th>
+                                    <th data-sort="costK">K-kostnad (kr/kg) <span class="sort-icon">▼</span></th>
+                                    <th data-sort="costS">S-kostnad (kr/kg) <span class="sort-icon">▼</span></th>
+                                </tr>
+                            </thead>
+                            <tbody id="products-tbody">
+                                <!-- Populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Tab Content: Cheapest Sources -->
+                <div id="tab-cheapest" class="tab-content">
+                    <div class="cheapest-grid">
+                        <!-- N -->
+                        <div class="cheapest-card">
+                            <h3>
+                                <div class="nutrient-icon icon-N">N</div>
+                                Billigaste Kväve (N)
+                            </h3>
+                            <ul class="product-list" id="cheapest-N">
+                                <!-- Populated by JavaScript -->
+                            </ul>
+                        </div>
+
+                        <!-- P -->
+                        <div class="cheapest-card">
+                            <h3>
+                                <div class="nutrient-icon icon-P">P</div>
+                                Billigaste Fosfor (P)
+                            </h3>
+                            <ul class="product-list" id="cheapest-P">
+                                <!-- Populated by JavaScript -->
+                            </ul>
+                        </div>
+
+                        <!-- K -->
+                        <div class="cheapest-card">
+                            <h3>
+                                <div class="nutrient-icon icon-K">K</div>
+                                Billigaste Kalium (K)
+                            </h3>
+                            <ul class="product-list" id="cheapest-K">
+                                <!-- Populated by JavaScript -->
+                            </ul>
+                        </div>
+
+                        <!-- S -->
+                        <div class="cheapest-card">
+                            <h3>
+                                <div class="nutrient-icon icon-S">S</div>
+                                Billigaste Svavel (S)
+                            </h3>
+                            <ul class="product-list" id="cheapest-S">
+                                <!-- Populated by JavaScript -->
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/analysis.js"></script>
+</body>
+</html>

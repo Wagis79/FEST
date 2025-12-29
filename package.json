@@ -1,0 +1,36 @@
+{
+  "name": "fest-nutrient-decision-support",
+  "version": "2.4.0",
+  "description": "Intelligent beslutsstöd för gödselrekommendationer med inköpslista och balanshantering",
+  "scripts": {
+    "server": "node --max-old-space-size=12288 node_modules/tsx/dist/cli.mjs src/api/start.ts",
+    "build": "tsc",
+    "smoke:admin": "tsx src/api/smoke-admin.ts",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "nutrient",
+    "fertilizer",
+    "recommendation",
+    "agriculture",
+    "shopping-list",
+    "balance-calculation"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^20.10.5",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.89.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "highs": "^1.8.0",
+    "javascript-lp-solver": "^0.4.24"
+  }
+}

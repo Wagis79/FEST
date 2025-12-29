@@ -1,0 +1,86 @@
+/* Fullskärms overlay för loading animation */
+.spreader-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 300ms ease-out;
+  overflow: hidden; /* Ingen scroll under animation */
+}
+
+/* Blur-lager som kommer växa bort underifrån */
+.spreader-blur-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(250, 250, 252, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  /* Mask som växer från botten med gradient - hanteras i JS */
+  transition: mask-image 50ms linear, -webkit-mask-image 50ms linear;
+}
+
+.spreader-overlay.visible {
+  opacity: 1;
+  pointer-events: all;
+}
+
+/* Låser scroll på body när overlay är synlig */
+body.loading-active {
+  overflow: hidden;
+}
+
+/* Canvas för partiklar och spridare */
+.spreader-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Dold text för skärmläsare */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Respektera prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  .spreader-overlay {
+    transition: opacity 150ms ease-out;
+  }
+  
+  /* Partiklar stängs av i JS, här bara backup */
+  .spreader-canvas {
+    animation: none !important;
+  }
+}
+
+/* Fade-in animation */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Fade-out animation */
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}

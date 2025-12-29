@@ -1,0 +1,423 @@
+# Changelog - FEST
+
+Alla viktiga ändringar i projektet dokumenteras här.
+
+## [2.4.1] - 2025-12-29
+
+### 🧹 Kodstädning och dokumentationsförenkling
+
+#### Borttagna filer
+- **docs/OPTIMIZE-V5-DEPENDENCIES.md** - Föråldrat tekniskt dokument
+- **scripts/test-v7.ts** - Utvecklingstestskript (kan köras med `npx tsx` vid behov)
+- **PRODUCT_ANALYSIS.md** - Feature-dokumentation (information finns i kod)
+
+#### Förenklade filer
+- **README.md** - Helt omskriven, fokuserad och aktuell (från 594 → ~150 rader)
+- **ARCHITECTURE.md** - Omskriven med aktuell information
+- **src/models/Tolerances.ts** - Borttagna oanvända konstanter (ECONOMIC_TOLERANCES, OPTIMIZED_TOLERANCES)
+
+#### Borttagna endpoints
+- **GET /api/strategies** - Oanvänd endpoint med föråldrad strategi-info
+
+#### Tekniskt
+- TypeScript kompilerar utan fel ✅
+- Inga brytande ändringar
+
+---
+
+## [2.4.0] - 2025-12-27
+
+### 🚀 Ny MILP-baserad optimeringsmotor (v5)
+
+#### Ny optimeringslogik
+- **ILP-solver**: Använder `javascript-lp-solver` för äkta heltalsoptimering
+- **Globalt optimum**: Minimerar produktkostnad (SEK/ha) med matematisk garanti
+- **Heltalsdoser**: Alla givor är exakta heltal (kg/ha)
+- **Prispall**: Returnerar upp till 3 olika strategier (produktmixar)
+
+#### Constraints (exakt enligt spec)
+- **N**: MÅSTE nå target, max +1 kg/ha över (aldrig under)
+- **P/K/S (om ikryssade)**: 85%-125% av target
+- **Dos per produkt**: minDose-maxDose (default 100-600 kg/ha)
+- **Max antal produkter**: 1-5 (autoökning vid infeasible)
+
+#### Nytt API-endpoint
+```
+POST /api/optimize-v5
+Body: {
+  targets: { N: 150, P: 20, K: 50, S: 15 },
+  mustFlags: { mustP: true, mustK: false, mustS: true },
+  maxProducts: 2,
+  minDose: 100,
+  maxDose: 600
+}
+```
+
+#### Returformat
+```json
+{
+  "status": "ok",
+  "usedMaxProducts": 2,
+  "strategies": [
+    {
+      "rank": 1,
+      "totalCostSekHa": 3220.08,
+      "products": [...],
+      "achieved": { "N": 150, "P": 17.08, "K": 29.28, "S": 16.8 },
+      "percentOfTarget": { "N": 100, "P": 85.4, "K": 58.6, "S": 112 },
+      "warnings": []
+    }
+  ]
+}
+```
+
+#### Numerisk stabilitet
+- Näringshalter skalas till tiondelsprocent (heltal)
+- Priser skalas till öre (heltal)
+- Alla constraints är heltal → inga flyttalsproblem
+
+#### Nya filer
+- `src/engine/optimize-v5.ts` - MILP-optimeringsmotor
+- `src/types/javascript-lp-solver.d.ts` - TypeScript-typer för solver
+
+#### Uppdaterade filer
+- `src/engine/recommend.ts` - Integrerar V5-motor (legacy). *Runtime är numera låst till V7*.
+- `src/api/server.ts` - Nytt endpoint `/api/optimize-v5`
+- `package.json` - Ny dependency `javascript-lp-solver`
+
+---
+
+## [2.3.0] - 2025-12-27
+
+### 🗄️ All data nu i Supabase - ingen hårdkodad data
+
+#### Nya funktioner
+- **Grödor i databas**: Alla 20 grödor nu i Supabase `crops`-tabell
+- **Förfruktsvärden integrerade**: N-effekt och skördeeffekt direkt på varje gröda
+- **API `/api/crops`**: Ny endpoint med kategorifilter (`?category=spannmal`)
+- **API `/api/calculate-need`**: Stödjer nu `precropId` för förfruktsberäkning
+- **Cache**: 5 minuters cache för grödor från Supabase
+- **Ingen fallback**: Tydliga felmeddelanden om databas ej tillgänglig
+
+#### Grödor med förfruktseffekt (N kg/ha)
+| Gröda | N-effekt |
+|-------|----------|
+| Blandvall (slåtter) | +40 |
+| Höstoljeväxter (raps) | +40 |
+| Foderärter | +35 |
+| Åkerböna | +25 |
+| Sockerbetor | +25 |
+| Våroljeväxter | +20 |
+| Potatis | +10 |
+| Gräsvall (slåtter) | +5 |
+
+#### Borttagna filer (3 st, ~600 rader hårdkodad data)
+- `src/data/products.ts` (516 rader) - Alla produkter från Supabase
+- `src/data/precrop-values.ts` - Ersatt av `crops.precrop_n_effect` i databas
+- `public/js/precrop-values.js` - Förfruktsvärde läses nu från crop-objekt
+
+#### Tekniska förbättringar
+- `supabase.ts`: Nya funktioner `getAllCrops()`, `getCropById()`, `getCropsByCategory()`
+- `crops.ts`: Endast typer och beräkningsfunktioner (ingen data)
+- `balance.js`: Läser precropEffect från crop-objekt istället för separat fil
+
+#### Datastruktur
+| Källa | Tabell | Antal |
+|-------|--------|-------|
+| Supabase | `Produkter` | 90+ produkter |
+| Supabase | `crops` | 20 grödor |
+
+#### Städning
+- Borttagen `dist/` med gammal build (refererade borttagna filer)
+- Borttagen `server.log` (loggfil)
+- Rensat `package.json`: borttagna `main`, `dev`, `start` (oanvända scripts)
+
+---
+
+## [2.2.1] - 2025-12-26
+
+### 🧹 Dokumentationsrensning
+
+#### Borttagna filer (15 filer, ~3,300 rader)
+
+**Oanvända kodfiler:**
+- `public/admin-new.html` (570 rader) - Aldrig refererad, duplicate
+
+**Gamla cleanup-loggar (inte längre relevanta):**
+- `CLEANUP_ANALYSIS.md` (252 rader)
+- `CLEANUP_REPORT.md` (256 rader)
+- `CLEANUP_SUMMARY.md` (231 rader)
+- `DEEP_ANALYSIS_ROUND2.md` (408 rader)
+- `DEEP_CLEANUP_FINAL.md` (355 rader)
+- `PASSWORD_FIX.md` (260 rader)
+
+**Konsoliderade dokument:**
+- `ADMIN_GUIDE.md` → SECURITY.md
+- `ADMIN_SETUP.md` → README.md
+- `ACCESS_CONTROL.md` → SECURITY.md
+- `QUICK_START.md` → README.md
+- `SUPABASE_SECURITY.md` → SECURITY.md
+- `PRODUCT_ANALYSIS_QUICKSTART.md` → PRODUCT_ANALYSIS.md
+- `PRODUCT_ANALYSIS_SUMMARY.md` → PRODUCT_ANALYSIS.md
+
+#### Ny dokumentationsstruktur (5 filer)
+- `README.md` - Översikt, installation, API-dokumentation
+- `ARCHITECTURE.md` - Frontend-arkitektur
+- `CHANGELOG.md` - Versionshistorik
+- `PRODUCT_ANALYSIS.md` - Produktanalys-verktyget
+- `SECURITY.md` - All säkerhetsdokumentation (konsoliderad)
+
+---
+
+## [2.2.0] - 2024-12-26
+
+### 🎉 Ny Feature: Produktanalys-verktyg
+
+#### Översikt
+Nytt admin-verktyg för att analysera produktpriser och näringskostnader. Hjälper produktansvariga att förstå vad som driver prisoptimeringen i FEST:s rekommendationer.
+
+#### Tillagda filer
+- **Backend API:**
+  - `src/api/server.ts` - Ny endpoint: `GET /api/admin/product-analysis` (+104 rader)
+- **Frontend:**
+  - `public/analysis.html` - Komplett analysverktyg (477 rader)
+  - `public/js/analysis.js` - Datahantering och UI-logik (335 rader)
+  - `public/admin.html` - Uppdaterad med navigationslänk till analysen
+
+#### Funktioner
+- **Näringskostnadsberäkning:**
+  - Beräknar kr/kg för varje näringsämne (N, P, K, S) per produkt
+  - Formel: `costPerNutrient = pricePerKg / (nutrientPercent / 100)`
+  
+- **Visualisering:**
+  - Färgkodad tabell (Grön = billig, Orange = medel, Röd = dyr)
+  - Sorterbar tabell (klicka på kolumnrubriker)
+  - Statistiköversikt (antal produkter, genomsnittspris)
+  
+- **Billigaste källor:**
+  - Top 5 billigaste produkter för varje näringsämne
+  - Ranking med detaljerad kostnadsinformation
+  - Jämförelsevyer per näringsämne
+
+#### Användning
+1. Logga in på admin-panelen (`/admin.html`)
+2. Klicka på "📊 Produktanalys"
+3. Utforska data via två flikar:
+   - **Alla produkter** - Fullständig tabell med sortering
+   - **Billigaste källor** - Top 5 för N, P, K, S
+
+#### Teknisk implementation
+- Backend: Express endpoint med admin-autentisering
+- Databearbetning: Realtidsberäkning av näringskostnader
+- Frontend: Vanilla JavaScript med dynamisk färgkodning
+- Security: Kräver admin-lösenord (sessionStorage)
+
+#### Verifiering
+- ✅ TypeScript-kompilering: SUCCESS
+- ✅ Server startar utan fel
+- ✅ API returnerar korrekt data
+- ✅ UI responsiv och funktionell
+- ✅ Autentisering fungerar
+- ✅ Zero breaking changes
+
+#### Dokumentation
+- `PRODUCT_ANALYSIS_FEATURE.md` - Komplett funktionsdokumentation
+
+---
+
+## [2.1.2] - 2024-12-26
+
+### 🧹 Deep Cleanup - Round 2 (Function-Level Analysis)
+
+#### Additional Dead Code Removed (2 files, 2 functions, ~281 lines)
+- **Deleted unused TypeScript files:**
+  - `src/index.ts` (175 lines) - CLI test file never used in production
+  - `src/engine/math.ts` (83 lines) - Utility functions not imported by optimize-v4
+- **Removed unused exports:**
+  - `Solution.installationInstructions()` (8 lines) - Never called anywhere
+  - `crops.getCropsByCategory()` (15 lines) - Exported but never imported
+
+#### Analysis Details
+- Performed deep function-level analysis of all exports
+- Verified import chains for every active function
+- Confirmed optimize-v4.ts has inline implementations (doesn't need math.ts)
+- index.ts was development/testing code, start.ts is production entry point
+
+#### Results
+- TypeScript files: 16 → 14 (-2 files, -33% from original)
+- Engine files: 4 → 3 (-1 file, -63% from original 8)
+- Total dead code removed (both rounds): ~1,758 lines
+- Clean compilation verified ✅
+- Zero breaking changes ✅
+
+#### Documentation
+- Created `DEEP_ANALYSIS_ROUND2.md` - Detailed function-level analysis
+- Created `DEEP_CLEANUP_FINAL.md` - Complete summary of both cleanup rounds
+
+**Result:** Codebase now has ZERO dead code. Crystal-clear architecture with only active files.
+
+## [2.1.1] - 2025-12-26
+
+### 🧹 Code Cleanup - Removed Dead Code
+
+#### Deleted Unused Files (5 files, ~1,477 lines)
+- **Removed old engine optimization files:**
+  - `src/engine/optimize-v2.ts` (744 lines) - Replaced by optimize-v4
+  - `src/engine/optimize-v3.ts` (623 lines) - Experimental, never used
+  - `src/engine/recommend-clean.ts` (80 lines) - Deprecated wrapper
+  - `src/engine/scoring-minimal.ts` (12 lines) - Redundant type definition
+- **Removed unused frontend file:**
+  - `public/js/admin-config.js` (18 lines) - Never referenced
+
+#### Code Quality Improvements
+- Updated outdated comments in `recommend.ts`
+- Clarified that **optimize-v4.ts** is the active algorithm
+- Verified clean TypeScript compilation
+- Zero breaking changes
+
+#### Documentation
+- Created `CLEANUP_ANALYSIS.md` - Detailed analysis of dead code
+- Created `CLEANUP_REPORT.md` - Complete cleanup summary
+
+**Result:** Cleaner codebase, faster compilation, reduced confusion about which optimizer is active.
+
+## [2.1.0] - 2025-12-21
+
+### 🏗️ Arkitektur - Modulär Frontend (SENASTE)
+
+#### Migration till JavaScript-moduler
+- **Skapade `public/js/` med 7 moduler (547 rader total)**
+  - `state.js` - Global state management (AppState)
+  - `storage.js` - localStorage wrapper
+  - `api.js` - Backend API-kommunikation
+  - `utils.js` - Formatering och helpers
+  - `tabs.js` - Tab-navigering
+  - `purchase-list.js` - Inköpslista-logik
+  - `app.js` - Auto-initiering
+- **Reducerade `index.html` från 2227 → 1250 rader**
+  - Tog bort 1000+ rader inline JavaScript
+  - Behöll endast HTML, CSS och minimal konfiguration
+- **Frontend matchar nu backend-struktur**
+  - Samma modularitet som `src/engine/`
+  - Separation of concerns, testbarhet, underhållbarhet
+- **Dokumentation**
+  - `public/js/README.md` - Fullständig modulöversikt
+  - `MIGRATION-GUIDE.md` - Migrationshistorik
+
+### ✨ Nya Funktioner
+
+#### Inköpslista/Shopping List
+- Ny flik "Inköpslista" med badge-räknare
+- Lägg till flera lösningar i en gemensam lista
+- Produktsammanställning som summerar samma produkter
+- Redigerbar hektar per lösning med realtidsuppdatering
+- Totaler i ton med tusentalsavskiljare
+- Toast-notifikationer vid sparning
+- **Persistent lagring med localStorage** - listan sparas automatiskt
+- Ta bort enskilda items från listan
+
+#### Växtnäringsbalans Toggle
+- Växla mellan "🌾 Förfrukt" och "📊 Växtnäringsbalans"
+- Förfrukt-läge: Beräkna från föregående gröda
+- Balans-läge: Direkt inmatning från jordprov
+- Toggle-knapp med ikoner högerställd vid rubrik
+
+#### Förbättrad Balansberäkning
+- Tar hänsyn till förfruktsvärde (ärter +30 kg N/ha, etc.)
+- Visuell feedback med grön info-box
+- Automatisk justering av näringsbehov baserat på balans
+- Stöd för förfrukt med negativa N-värden (extrabehov)
+
+#### Formatering & UX
+- `formatNumber()`: Tusentalsavskiljare (1234567 → "1 234 567")
+- `formatWeight()`: Automatisk ton/kg-konvertering med 2 decimaler
+- Smooth animations och transitions
+- Förbättrad visuell hierarki
+
+#### Resultathantering
+- 4 sorteringslägen: optimal, cheapest, balanced, fewest
+- Sortering utan ny API-call (client-side)
+- Visa topp 5 resultat (topp 3 med medaljer)
+
+### 🔧 Backend-förbättringar
+
+#### Toleranser (Stora förändringar!)
+**Ekonomisk strategi:**
+- N och default: 0% till 999% (måste uppnås, kan övergödslas)
+
+**Optimerad strategi (Kraftigt utökad):**
+- N: -5% till +15% (från -5% till +10%)
+- P: -20% till +50% (från -15% till +25%)
+- K: -20% till +150% (från -15% till +25%)
+- S: -25% till +150% (från -20% till +30%)
+
+**Anledning:** Kombigödsel innehåller ofta överskott av K och S. Gamla toleranser var orealistiskt snäva.
+
+#### Filter-logik (Totalomskriven!)
+- **Ekonomisk:** Bara ikryssade näringsämnen måste vara ≥0%
+- **Optimerad:** ALLA näringsämnen måste vara inom tolerans
+- Tydlig separation mellan strategier
+- Utförlig dokumentation i koden
+
+#### Scoring (Uppdaterad)
+- **Ekonomisk:** `cost × 0.95 + penalty × 0.05` (95% kostnadsfokus)
+- **Optimerad:** `cost × 0.1 + penalty × 0.9` (90% precisionsfokus)
+- Kväve (N) får 3x högre vikt i penalty-beräkning
+
+#### Kapacitet
+- Max kg/ha ökad från 1200 till **3000**
+- Hanterar höga skördar (t.ex. HV 12 ton)
+- DEFAULT_MAX_KG uppdaterad i generate.ts och recommend.ts
+
+### 🐛 Buggfixar
+
+1. **"Hittar inget på HV 12 ton"**
+   - Problem: Optimerad strategi hittade 0 lösningar för höga skördar
+   - Fix: Utökade toleranser för K och S till 150%
+
+2. **Ekonomisk strategi hittar inga lösningar med 4 näringsämnen**
+   - Problem: För snäva toleranser
+   - Fix: Ekonomisk tillåter nu 0-999% för ikryssade näringsämnen
+
+3. **Emoji-ikoner visas som �**
+   - Problem: Character encoding issue
+   - Fix: Använd HTML entities (&#128203;) istället för direkta emojis
+
+4. **Inköpslista i fel position**
+   - Problem: Visades i resultat-sektionen
+   - Fix: Egen dedikerad tab med separat innehåll
+
+### 📝 Dokumentation
+
+- README.md fullständigt uppdaterad
+- Alla nya funktioner dokumenterade
+- API-endpoints korrekt dokumenterade
+- Strategier och toleranser förklarade
+- Användningsexempel för alla lägen
+- Denna CHANGELOG.md skapad
+
+### 🔄 Teknisk skuld (Kvar att göra)
+
+- [ ] Refaktorera index.html (2226 rader - flytta JS till separat fil)
+- [ ] Skapa modulstruktur för frontend
+- [ ] Generalisera dubblerad kod (enkel vs avancerad)
+- [ ] Lägg till enhetstester för engine
+- [ ] Överväg state management istället för globala variabler
+
+## [2.0.0] - 2025-12-15 (Före datorkrasch)
+
+### Initial version med grundfunktionalitet
+- Grundläggande rekommendationssystem
+- Enkel och avancerad flik
+- Traktor-animation med spreader
+- Backend med TypeScript
+- Express API
+- Produktdatabas
+- Grödor och näringsbehov
+
+---
+
+**Format:** [Semantic Versioning](https://semver.org/)
+- MAJOR: Breaking changes
+- MINOR: Nya funktioner (bakåtkompatibla)
+- PATCH: Buggfixar (bakåtkompatibla)

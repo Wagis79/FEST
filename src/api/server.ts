@@ -1,0 +1,1140 @@
+import express, { Request, Response, NextFunction } from 'express';
+import cors from 'cors';
+import path from 'path';
+import fs from 'fs';
+import dotenv from 'dotenv';
+import { calculateNutrientNeed, calculateNutrientNeedWithPrecrop, Crop } from '../data/crops';
+import { recommend, RecommendOptions } from '../engine/recommend';
+import { optimizeV5, OptimizeV5Input, OptimizeV5Output } from '../engine/optimize-v5';
+import { optimizeV7, OptimizeV7Input, OptimizeV7Output } from '../engine/optimize-v7';
+import { NutrientNeed } from '../models/NutrientNeed';
+import { Strategy } from '../engine/scoring';
+import { Product } from '../models/Product';
+import { 
+  supabase,
+  supabaseAdmin,
+  PRODUCTS_TABLE, 
+  dbProductToProduct, 
+  dbProductToAdminProduct,
+  productToDBProduct,
+  getAllProductsForRecommendation,
+  getProductsForRecommendation,
+  getAllCrops,
+  getCropById,
+  getCropsByCategory,
+  getAlgorithmConfigMap,
+  deleteLegacyEngineConfig
+} from './supabase';
+
+// Load environment variables
+dotenv.config();
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Admin password from environment
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+
+// Simple password check middleware
+function requireAdminPassword(req: Request, res: Response, next: NextFunction) {
+  const password = req.headers['x-admin-password'];
+  
+  if (password === ADMIN_PASSWORD) {
+    next();
+  } else {
+    res.status(403).json({
+      success: false,
+      error: 'Felaktigt admin-lösenord'
+    });
+  }
+}
+
+// Global Middleware
+app.use(cors());
+app.use(express.json());
+
+// Public static files
+app.use(express.static(path.join(__dirname, '../../public')));
+
+// Serve index.html for root
+app.get('/', (req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, '../../public/index.html'));
+});
+
+/**
+ * GET /api/products
+ * Returnera alla tillgängliga produkter (för rekommendationsmotorn)
+ */
+app.get('/api/products', async (req: Request, res: Response) => {
+  try {
+    const products = await getAllProductsForRecommendation();
+    res.json({
+      success: true,
+      count: products.length,
+      products: products,
+    });
+  } catch (error) {
+    console.error('Error fetching products:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Kunde inte hämta produkter',
+    });
+  }
+});
+
+/**
+ * POST /api/recommend
+ * Få rekommendationer baserat på näringsbehov
+ * 
+ * Body: {
+ *   need: { N?: number, P?: number, K?: number, S?: number },
+ *   strategy?: 'cheapest' | 'balanced' | 'most_exact',
+ *   maxProducts?: 1 | 2,
+ *   topN?: number
+ * }
+ */
+app.post('/api/recommend', async (req: Request, res: Response) => {
+  try {
+  const { need, strategy = 'economic', maxProducts, topN = 10, requiredNutrients, excludedProductIds } = req.body;
+
+    console.log('📥 /api/recommend request:', { 
+      need, 
+      strategy, 
+      maxProducts: maxProducts, 
+      maxProductsType: typeof maxProducts,
+      topN, 
+      requiredNutrients,
+      excludedProductIds: excludedProductIds ? excludedProductIds.length : 0
+    });
+
+    // Validera input
+    if (!need || typeof need !== 'object') {
+      return res.status(400).json({
+        success: false,
+        error: 'Näringsbehov (need) krävs och måste vara ett objekt',
+      });
+    }
+
+    // Validera att minst ett näringsämne finns
+    if (!need.N && !need.P && !need.K && !need.S) {
+      return res.status(400).json({
+        success: false,
+        error: 'Minst ett näringsämne måste anges',
+      });
+    }
+
+    // Validera strategi
+    const validStrategies: Strategy[] = ['economic', 'optimized'];
+    if (!validStrategies.includes(strategy)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Strategi måste vara economic eller optimized',
+      });
+    }
+
+  // Hämta produkter från Supabase (behovsstyrt urval för bättre träffbild)
+  let products = await getProductsForRecommendation(need as NutrientNeed, strategy);
+    
+  // Filtrera bort användarexkluderade produkter
+  if (excludedProductIds && Array.isArray(excludedProductIds) && excludedProductIds.length > 0) {
+    const excludedSet = new Set(excludedProductIds);
+    const originalCount = products.length;
+    products = products.filter(p => !excludedSet.has(p.id));
+    console.log(`🚫 Exkluderade ${originalCount - products.length} produkter (${excludedProductIds.length} angivna)`);
+  }
+    
+    if (products.length === 0) {
+      return res.status(500).json({
+        success: false,
+        error: 'Inga produkter tillgängliga för beräkning',
+      });
+    }
+
+    // Hämta algoritmkonfiguration från databasen
+    let algorithmConfig;
+    try {
+      algorithmConfig = await getAlgorithmConfigMap();
+      console.log('⚙️  Algoritmkonfiguration laddad för /recommend');
+    } catch (configErr) {
+      console.warn('⚠️  Kunde inte ladda algoritmkonfiguration, använder defaults:', configErr);
+      // Fortsätt med defaults om config inte kan laddas
+    }
+
+    // Kör rekommendationsmotor med användarens val av maxProducts.
+    const options: RecommendOptions = {
+      strategy,
+      maxProducts: maxProducts,
+      topN,
+      requiredNutrients: requiredNutrients || undefined,
+      algorithmConfig,
+    };
+
+    const solutions = await recommend(need as NutrientNeed, products, options);
+
+    res.json({
+      success: true,
+      count: solutions.length,
+      need,
+      strategy,
+      requiredNutrients: requiredNutrients || [],
+      solutions,
+    });
+  } catch (error) {
+    console.error('Error in /api/recommend:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Serverfel vid beräkning av rekommendationer',
+    });
+  }
+});
+
+/**
+ * POST /api/optimize-v5
+ * MILP-baserad ILP-optimering (global optimum)
+ * 
+ * Body: {
+ *   targets: { N: number, P?: number, K?: number, S?: number },
+ *   mustFlags: { mustP?: boolean, mustK?: boolean, mustS?: boolean },
+ *   maxProducts?: number (1-5, default 2),
+ *   minDose?: number (default 100),
+ *   maxDose?: number (default 600)
+ * }
+ * 
+ * Returnerar prispall med upp till 3 strategier (billigaste produktmixar)
+ */
+app.post('/api/optimize-v5', async (req: Request, res: Response) => {
+  try {
+    const { 
+      targets, 
+      mustFlags = {}, 
+      maxProducts = 2, 
+      minDose = 100, 
+      maxDose = 600 
+    } = req.body;
+
+    console.log('📥 /api/optimize-v5 request:', { 
+      targets, 
+      mustFlags, 
+      maxProducts,
+      minDose,
+      maxDose 
+    });
+
+    // Validera targets
+    if (!targets || typeof targets !== 'object') {
+      return res.status(400).json({
+        success: false,
+        error: 'targets krävs och måste vara ett objekt med N, P, K, S',
+      });
+    }
+
+    // N måste finnas
+    if (!targets.N || targets.N <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Kvävebehov (targets.N) måste vara > 0',
+      });
+    }
+
+    // Validera maxProducts
+    const maxProd = Math.min(5, Math.max(1, parseInt(maxProducts) || 2));
+
+    // Hämta alla produkter
+    const products = await getAllProductsForRecommendation();
+    
+    if (products.length === 0) {
+      return res.status(500).json({
+        success: false,
+        error: 'Inga produkter tillgängliga för optimering',
+      });
+    }
+
+    console.log(`🔧 V5-optimering med ${products.length} produkter`);
+
+    // Kör V5-optimering
+    const input: OptimizeV5Input = {
+      targets: {
+        N: targets.N || 0,
+        P: targets.P || 0,
+        K: targets.K || 0,
+        S: targets.S || 0,
+      },
+      mustFlags: {
+        mustP: mustFlags.mustP || false,
+        mustK: mustFlags.mustK || false,
+        mustS: mustFlags.mustS || false,
+      },
+      maxProductsUser: maxProd,
+      minDoseKgHa: minDose,
+      maxDoseKgHa: maxDose,
+    };
+
+    // Hämta algoritmkonfiguration från databasen
+    try {
+      const algorithmConfig = await getAlgorithmConfigMap();
+      input.config = algorithmConfig;
+      console.log('⚙️  Algoritmkonfiguration laddad för /optimize-v5');
+    } catch (configErr) {
+      console.warn('⚠️  Kunde inte ladda algoritmkonfiguration, använder defaults:', configErr);
+      // Fortsätt med defaults om config inte kan laddas
+    }
+
+    const result = optimizeV5(products, input);
+
+    console.log(`✅ V5 returnerade: ${result.strategies.length} strategier, status: ${result.status}`);
+
+    res.json({
+      success: result.status === 'ok',
+      ...result,
+    });
+  } catch (error) {
+    console.error('Error in /api/optimize-v5:', error);
+    res.status(500).json({
+      success: false,
+      status: 'error',
+      error: 'Serverfel vid V5-optimering',
+      message: error instanceof Error ? error.message : 'Okänt fel',
+    });
+  }
+});
+
+/**
+ * POST /api/optimize-v7
+ * MILP-baserad ILP-optimering (v7 - produktionsredo med full specifikation)
+ * 
+ * Body: {
+ *   targets: { N?: number, P?: number, K?: number, S?: number },
+ *   mustFlags: { mustN?: boolean, mustP?: boolean, mustK?: boolean, mustS?: boolean },
+ *   maxProducts?: number (1-4, default 2),
+ *   minDose?: number (default 100),
+ *   maxDose?: number (default 600)
+ * }
+ * 
+ * Funktioner:
+ * - Validering: minst ett ämne aktiverat, target >= 1 för aktiverade
+ * - N: exakt target..target+tol (eskalerar tol vid behov)
+ * - P/K/S: 85%-125% av target
+ * - Single nutrient mode: ranking av enskilda produkter
+ * - Prispall med 3 strategier via no-good cuts
+ * - Warnings för ej aktiverade ämnen med hög nivå
+ */
+app.post('/api/optimize-v7', async (req: Request, res: Response) => {
+  try {
+    const { 
+      targets, 
+      mustFlags = {}, 
+      maxProducts = 2, 
+      minDose = 100, 
+      maxDose = 600 
+    } = req.body;
+
+    console.log('📥 /api/optimize-v7 request:', { 
+      targets, 
+      mustFlags, 
+      maxProducts,
+      minDose,
+      maxDose 
+    });
+
+    // Validera targets
+    if (!targets || typeof targets !== 'object') {
+      return res.status(400).json({
+        success: false,
+        error: 'targets krävs och måste vara ett objekt med N, P, K, S',
+      });
+    }
+
+    // Validera maxProducts (hård cap 4)
+    const maxProd = Math.min(4, Math.max(1, parseInt(maxProducts) || 2));
+
+    // Hämta alla produkter
+    const products = await getAllProductsForRecommendation();
+    
+    if (products.length === 0) {
+      return res.status(500).json({
+        success: false,
+        error: 'Inga produkter tillgängliga för optimering',
+      });
+    }
+
+    console.log(`🔧 V7-optimering med ${products.length} produkter`);
+
+    // Kör V7-optimering
+    const input: OptimizeV7Input = {
+      targets: {
+        N: targets.N || 0,
+        P: targets.P || 0,
+        K: targets.K || 0,
+        S: targets.S || 0,
+      },
+      mustFlags: {
+        mustN: mustFlags.mustN || false,
+        mustP: mustFlags.mustP || false,
+        mustK: mustFlags.mustK || false,
+        mustS: mustFlags.mustS || false,
+      },
+      maxProductsUser: maxProd,
+      minDoseKgHa: minDose,
+      maxDoseKgHa: maxDose,
+    };
+
+    // Hämta algoritmkonfiguration från databasen
+    try {
+      const algorithmConfig = await getAlgorithmConfigMap();
+      input.config = algorithmConfig;
+      console.log('⚙️  Algoritmkonfiguration laddad för /optimize-v7');
+    } catch (configErr) {
+      console.warn('⚠️  Kunde inte ladda algoritmkonfiguration, använder defaults:', configErr);
+    }
+
+    const result = await optimizeV7(products, input);
+
+    console.log(`✅ V7 returnerade: ${result.strategies.length} strategier, status: ${result.status}`);
+
+    res.json({
+      success: result.status === 'ok',
+      ...result,
+    });
+  } catch (error) {
+    console.error('Error in /api/optimize-v7:', error);
+    res.status(500).json({
+      success: false,
+      status: 'error',
+      error: 'Serverfel vid V7-optimering',
+      message: error instanceof Error ? error.message : 'Okänt fel',
+    });
+  }
+});
+
+/**
+ * GET /api/crops
+ * Returnera alla tillgängliga grödor från Supabase
+ */
+app.get('/api/crops', async (req: Request, res: Response) => {
+  try {
+    const category = req.query.category as string | undefined;
+    
+    let crops;
+    if (category) {
+      crops = await getCropsByCategory(category as any);
+    } else {
+      crops = await getAllCrops();
+    }
+    
+    if (crops.length === 0) {
+      console.error('❌ Inga grödor hittades i databasen');
+      return res.status(503).json({
+        success: false,
+        error: 'Kunde inte hämta grödor från databasen',
+      });
+    }
+    
+    res.json({
+      success: true,
+      count: crops.length,
+      crops: crops,
+    });
+  } catch (error) {
+    console.error('Error fetching crops:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Serverfel vid hämtning av grödor',
+    });
+  }
+});
+
+/**
+ * POST /api/calculate-need
+ * Beräkna näringsbehov från gröda och skörd
+ * 
+ * Body: {
+ *   cropId: string,
+ *   yieldTonPerHa: number,
+ *   precropId?: string  // Valfri förfrukt
+ * }
+ */
+app.post('/api/calculate-need', async (req: Request, res: Response) => {
+  try {
+    const { cropId, yieldTonPerHa, precropId } = req.body;
+
+    if (!cropId || !yieldTonPerHa) {
+      return res.status(400).json({
+        success: false,
+        error: 'cropId och yieldTonPerHa krävs',
+      });
+    }
+
+    const crop = await getCropById(cropId);
+    if (!crop) {
+      return res.status(404).json({
+        success: false,
+        error: `Gröda med id '${cropId}' hittades inte`,
+      });
+    }
+
+    // Hämta förfrukt om angiven
+    const precrop = precropId ? await getCropById(precropId) : null;
+    
+    // Beräkna med eller utan förfruktseffekt
+    let need;
+    let precropNEffect = 0;
+    let yieldIncreaseKgHa = 0;
+    let yieldIncreaseNRequirement = 0;
+    
+    if (precrop) {
+      const result = calculateNutrientNeedWithPrecrop(crop, yieldTonPerHa, precrop);
+      need = { N: result.N, P: result.P, K: result.K, S: result.S };
+      precropNEffect = result.precropNEffect;
+      yieldIncreaseKgHa = result.yieldIncreaseKgHa;
+      yieldIncreaseNRequirement = result.yieldIncreaseNRequirement;
+    } else {
+      need = calculateNutrientNeed(crop, yieldTonPerHa);
+    }
+
+    res.json({
+      success: true,
+      crop: crop.name,
+      yieldTonPerHa,
+      need,
+      precrop: precrop ? {
+        id: precrop.id,
+        name: precrop.name,
+        nEffect: precropNEffect,
+        yieldIncreaseKgHa,
+        yieldIncreaseNRequirement,
+      } : null,
+    });
+  } catch (error) {
+    console.error('Error in /api/calculate-need:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Serverfel vid beräkning av näringsbehov',
+    });
+  }
+});
+
+/**
+ * GET /health
+ * Health check endpoint
+ */
+app.get('/health', (req: Request, res: Response) => {
+  res.json({
+    success: true,
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// ============================================================================
+// ADMIN API ENDPOINTS (Supabase Integration)
+// Protected with simple password check
+// ============================================================================
+
+// Protect all admin API routes with password
+app.use('/api/admin', requireAdminPassword);
+
+/**
+ * GET /api/admin/products
+ * Fetch all products from Supabase database
+ */
+app.get('/api/admin/products', async (req: Request, res: Response) => {
+  try {
+    const { data, error } = await supabase
+      .from(PRODUCTS_TABLE)
+      .select('*')
+      .order('Produkt', { ascending: true });
+
+    if (error) {
+      console.error('Supabase error:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to fetch products from database',
+        details: error.message,
+      });
+    }
+
+    // Return raw database data (no transformation)
+    res.json(data || []);
+  } catch (error: any) {
+    console.error('Server error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      details: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/admin/products
+ * Add a new product to Supabase database
+ */
+app.post('/api/admin/products', async (req: Request, res: Response) => {
+  try {
+    const product = req.body;
+
+    // Check if data is in DB format (from admin.js) or app format
+    let dbProduct: any;
+    if (product.Artikelnr !== undefined && product.Produkt !== undefined) {
+      // Already in DB format from admin.js
+      dbProduct = { ...product };
+      // Remove fields that don't exist in the database
+      delete dbProduct.idx;
+    } else {
+      // App format - validate required fields
+      if (!product.id || !product.name || product.pricePerKg === undefined) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing required fields: id, name, pricePerKg',
+        });
+      }
+      // Transform to DB format
+      dbProduct = productToDBProduct(product);
+    }
+
+    // Insert into Supabase using admin client (bypasses RLS)
+    const { data, error } = await supabaseAdmin
+      .from(PRODUCTS_TABLE)
+      .insert([dbProduct])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Supabase error:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to add product to database',
+        details: error.message,
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Product added successfully',
+      product: dbProductToProduct(data),
+    });
+  } catch (error: any) {
+    console.error('Server error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      details: error.message,
+    });
+  }
+});
+
+/**
+ * PUT /api/admin/products/:id
+ * Update an existing product in Supabase database
+ */
+app.put('/api/admin/products/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const product = req.body;
+
+    // Extract Artikelnr from id (format: prod-300024)
+    const artikelnr = parseInt(id.replace('prod-', ''));
+
+    // If data comes from admin.js (already in DB format with Artikelnr), use directly
+    // Otherwise transform from app format
+    let dbProduct: any;
+    if (product.Artikelnr !== undefined) {
+      // Already in DB format from admin.js
+      dbProduct = { ...product };
+      delete dbProduct.Artikelnr; // Don't update primary key
+      delete dbProduct.idx; // Field doesn't exist in database
+    } else {
+      // App format, transform
+      dbProduct = productToDBProduct(product);
+    }
+
+    // Update in Supabase using admin client (bypasses RLS)
+    const { data, error } = await supabaseAdmin
+      .from(PRODUCTS_TABLE)
+      .update(dbProduct)
+      .eq('Artikelnr', artikelnr)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Supabase error:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to update product in database',
+        details: error.message,
+      });
+    }
+
+    if (!data) {
+      return res.status(404).json({
+        success: false,
+        error: `Product with id '${id}' not found`,
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Product updated successfully',
+      product: dbProductToProduct(data),
+    });
+  } catch (error: any) {
+    console.error('Server error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      details: error.message,
+    });
+  }
+});
+
+/**
+ * DELETE /api/admin/products/:id
+ * Delete a product from Supabase database
+ */
+app.delete('/api/admin/products/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // Extract Artikelnr from id (format: prod-300024)
+    const artikelnr = parseInt(id.replace('prod-', ''));
+
+    // Delete from Supabase using admin client (bypasses RLS)
+    const { error } = await supabaseAdmin
+      .from(PRODUCTS_TABLE)
+      .delete()
+      .eq('Artikelnr', artikelnr);
+
+    if (error) {
+      console.error('Supabase error:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to delete product from database',
+        details: error.message,
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Product deleted successfully',
+      productId: id,
+    });
+  } catch (error: any) {
+    console.error('Server error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      details: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/admin/product-analysis
+ * Analyze product pricing and nutrient costs
+ * Returns cost per kg of N, P, K, S for each product
+ */
+app.get('/api/admin/product-analysis', requireAdminPassword, async (req: Request, res: Response) => {
+  try {
+    // Get all products
+    const products = await getAllProductsForRecommendation();
+
+    // Calculate cost per nutrient for each product
+    interface ProductAnalysis {
+      id: string;
+      name: string;
+      pricePerKg: number;
+      nutrients: {
+        N?: number;
+        P?: number;
+        K?: number;
+        S?: number;
+      };
+      costPerNutrient: {
+        N?: number | null;
+        P?: number | null;
+        K?: number | null;
+        S?: number | null;
+      };
+      usableNutrients: string[]; // Which nutrients can this product provide
+    }
+
+    const analysis: ProductAnalysis[] = products.map(product => {
+      const costPerNutrient: ProductAnalysis['costPerNutrient'] = {};
+      const usableNutrients: string[] = [];
+
+      // Calculate cost per kg of each nutrient
+      // Formula: (pricePerKg / (nutrientPercent / 100))
+      // Example: If product costs 10 kr/kg and has 20% N, then N costs 10 / 0.20 = 50 kr/kg
+      
+      if (product.nutrients.N && product.nutrients.N > 0) {
+        costPerNutrient.N = product.pricePerKg / (product.nutrients.N / 100);
+        usableNutrients.push('N');
+      } else {
+        costPerNutrient.N = null;
+      }
+
+      if (product.nutrients.P && product.nutrients.P > 0) {
+        costPerNutrient.P = product.pricePerKg / (product.nutrients.P / 100);
+        usableNutrients.push('P');
+      } else {
+        costPerNutrient.P = null;
+      }
+
+      if (product.nutrients.K && product.nutrients.K > 0) {
+        costPerNutrient.K = product.pricePerKg / (product.nutrients.K / 100);
+        usableNutrients.push('K');
+      } else {
+        costPerNutrient.K = null;
+      }
+
+      if (product.nutrients.S && product.nutrients.S > 0) {
+        costPerNutrient.S = product.pricePerKg / (product.nutrients.S / 100);
+        usableNutrients.push('S');
+      } else {
+        costPerNutrient.S = null;
+      }
+
+      return {
+        id: product.id,
+        name: product.name,
+        pricePerKg: product.pricePerKg,
+        nutrients: product.nutrients,
+        costPerNutrient,
+        usableNutrients
+      };
+    });
+
+    // Calculate cheapest sources for each nutrient
+    const cheapestSources = {
+      N: analysis.filter(p => p.costPerNutrient.N !== null).sort((a, b) => (a.costPerNutrient.N || 999999) - (b.costPerNutrient.N || 999999)).slice(0, 5),
+      P: analysis.filter(p => p.costPerNutrient.P !== null).sort((a, b) => (a.costPerNutrient.P || 999999) - (b.costPerNutrient.P || 999999)).slice(0, 5),
+      K: analysis.filter(p => p.costPerNutrient.K !== null).sort((a, b) => (a.costPerNutrient.K || 999999) - (b.costPerNutrient.K || 999999)).slice(0, 5),
+      S: analysis.filter(p => p.costPerNutrient.S !== null).sort((a, b) => (a.costPerNutrient.S || 999999) - (b.costPerNutrient.S || 999999)).slice(0, 5)
+    };
+
+    res.json({
+      success: true,
+      totalProducts: products.length,
+      analysis,
+      cheapestSources,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error: any) {
+    console.error('Product analysis error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to analyze products',
+      details: error.message,
+    });
+  }
+});
+
+// ============================================================================
+// CROPS ADMIN API ENDPOINTS
+// ============================================================================
+
+/**
+ * GET /api/admin/crops
+ * Get all crops (raw database format for admin)
+ */
+app.get('/api/admin/crops', requireAdminPassword, async (req: Request, res: Response) => {
+  try {
+    const { getAllCropsRaw } = await import('./supabase');
+    const crops = await getAllCropsRaw();
+    res.json(crops);
+  } catch (error: any) {
+    console.error('Error fetching crops:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Kunde inte hämta grödor',
+      details: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/admin/crops
+ * Create a new crop
+ */
+app.post('/api/admin/crops', requireAdminPassword, async (req: Request, res: Response) => {
+  try {
+    const { createCrop } = await import('./supabase');
+    
+    const cropData = {
+      id: req.body.id,
+      name: req.body.name,
+      category: req.body.category,
+      unit: req.body.unit,
+      n_per_ton: req.body.n_per_ton,
+      p_per_ton: req.body.p_per_ton,
+      k_per_ton: req.body.k_per_ton,
+      s_per_ton: req.body.s_per_ton || null,
+      yield_min: req.body.yield_min,
+      yield_max: req.body.yield_max,
+      yield_average: req.body.yield_average,
+      precrop_n_effect: req.body.precrop_n_effect,
+      precrop_yield_effect: req.body.precrop_yield_effect,
+      description: req.body.description || null,
+      source_provider: req.body.source_provider || 'Jordbruksverket',
+      source_note: req.body.source_note || null,
+    };
+    
+    const newCrop = await createCrop(cropData);
+    
+    console.log(`✅ Gröda skapad: ${newCrop.name}`);
+    res.status(201).json(newCrop);
+  } catch (error: any) {
+    console.error('Error creating crop:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Kunde inte skapa gröda',
+      details: error.message,
+    });
+  }
+});
+
+/**
+ * PUT /api/admin/crops/:id
+ * Update an existing crop
+ */
+app.put('/api/admin/crops/:id', requireAdminPassword, async (req: Request, res: Response) => {
+  try {
+    const { updateCrop } = await import('./supabase');
+    const cropId = req.params.id;
+    
+    const cropData = {
+      name: req.body.name,
+      category: req.body.category,
+      unit: req.body.unit,
+      n_per_ton: req.body.n_per_ton,
+      p_per_ton: req.body.p_per_ton,
+      k_per_ton: req.body.k_per_ton,
+      s_per_ton: req.body.s_per_ton || null,
+      yield_min: req.body.yield_min,
+      yield_max: req.body.yield_max,
+      yield_average: req.body.yield_average,
+      precrop_n_effect: req.body.precrop_n_effect,
+      precrop_yield_effect: req.body.precrop_yield_effect,
+      description: req.body.description || null,
+      source_provider: req.body.source_provider || 'Jordbruksverket',
+      source_note: req.body.source_note || null,
+    };
+    
+    const updatedCrop = await updateCrop(cropId, cropData);
+    
+    console.log(`✅ Gröda uppdaterad: ${cropId}`);
+    res.json(updatedCrop);
+  } catch (error: any) {
+    console.error('Error updating crop:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Kunde inte uppdatera gröda',
+      details: error.message,
+    });
+  }
+});
+
+/**
+ * DELETE /api/admin/crops/:id
+ * Delete a crop
+ */
+app.delete('/api/admin/crops/:id', requireAdminPassword, async (req: Request, res: Response) => {
+  try {
+    const { deleteCrop } = await import('./supabase');
+    const cropId = req.params.id;
+    
+    await deleteCrop(cropId);
+    
+    console.log(`✅ Gröda borttagen: ${cropId}`);
+    res.json({ success: true, message: 'Gröda borttagen' });
+  } catch (error: any) {
+    console.error('Error deleting crop:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Kunde inte ta bort gröda',
+      details: error.message,
+    });
+  }
+});
+
+// ============================================================================
+// ALGORITHM CONFIG API
+// ============================================================================
+
+/**
+ * GET /api/admin/config
+ * Get all algorithm configuration parameters
+ */
+app.get('/api/admin/config', requireAdminPassword, async (req: Request, res: Response) => {
+  try {
+    const { getAlgorithmConfig } = await import('./supabase');
+    const config = await getAlgorithmConfig();
+    
+    res.json({
+      success: true,
+      count: config.length,
+      config: config,
+    });
+  } catch (error: any) {
+    console.error('Error fetching algorithm config:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Kunde inte hämta algoritmkonfiguration',
+      details: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/admin/config/:key
+ * Get a specific configuration parameter
+ */
+app.get('/api/admin/config/:key', requireAdminPassword, async (req: Request, res: Response) => {
+  try {
+    const { getAlgorithmConfig } = await import('./supabase');
+    const config = await getAlgorithmConfig();
+    const param = config.find(c => c.key === req.params.key);
+    
+    if (!param) {
+      return res.status(404).json({
+        success: false,
+        error: `Okänd konfigurationsnyckel: ${req.params.key}`,
+      });
+    }
+    
+    res.json({
+      success: true,
+      param: param,
+    });
+  } catch (error: any) {
+    console.error('Error fetching config param:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Kunde inte hämta konfigurationsparameter',
+      details: error.message,
+    });
+  }
+});
+
+/**
+ * PUT /api/admin/config/:key
+ * Update a specific configuration parameter
+ */
+app.put('/api/admin/config/:key', requireAdminPassword, async (req: Request, res: Response) => {
+  try {
+    const { updateAlgorithmConfigValue, getAlgorithmConfig } = await import('./supabase');
+    const key = req.params.key;
+    const { value } = req.body;
+    
+    if (value === undefined || value === null) {
+      return res.status(400).json({
+        success: false,
+        error: 'Värde saknas i request body',
+      });
+    }
+    
+    const numValue = Number(value);
+    if (isNaN(numValue)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Värdet måste vara ett nummer',
+      });
+    }
+    
+    await updateAlgorithmConfigValue(key, numValue);
+    
+    // Hämta uppdaterat värde
+    const config = await getAlgorithmConfig();
+    const param = config.find(c => c.key === key);
+    
+    console.log(`✅ Konfiguration uppdaterad: ${key} = ${numValue}`);
+    res.json({
+      success: true,
+      message: `Konfiguration uppdaterad: ${key} = ${numValue}`,
+      param: param,
+    });
+  } catch (error: any) {
+    console.error('Error updating config:', error);
+    res.status(400).json({
+      success: false,
+      error: error.message || 'Kunde inte uppdatera konfiguration',
+    });
+  }
+});
+
+/**
+ * POST /api/admin/config/batch
+ * Update multiple configuration parameters at once
+ */
+app.post('/api/admin/config/batch', requireAdminPassword, async (req: Request, res: Response) => {
+  try {
+    const { updateAlgorithmConfigValue, getAlgorithmConfig } = await import('./supabase');
+    const { updates } = req.body;
+    
+    if (!updates || !Array.isArray(updates)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Request body måste innehålla en "updates" array',
+      });
+    }
+    
+    const results: { key: string; success: boolean; error?: string }[] = [];
+    
+    for (const update of updates) {
+      try {
+        const numValue = Number(update.value);
+        if (isNaN(numValue)) {
+          results.push({ key: update.key, success: false, error: 'Ogiltigt nummer' });
+          continue;
+        }
+        
+        await updateAlgorithmConfigValue(update.key, numValue);
+        results.push({ key: update.key, success: true });
+      } catch (err: any) {
+        results.push({ key: update.key, success: false, error: err.message });
+      }
+    }
+    
+    const successCount = results.filter(r => r.success).length;
+    
+    console.log(`✅ Batch-uppdatering: ${successCount}/${updates.length} lyckades`);
+    res.json({
+      success: successCount === updates.length,
+      message: `${successCount} av ${updates.length} uppdateringar lyckades`,
+      results: results,
+    });
+  } catch (error: any) {
+    console.error('Error batch updating config:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Kunde inte uppdatera konfiguration',
+      details: error.message,
+    });
+  }
+});
+
+/**
+ * DELETE /api/admin/config/legacy-engine
+ * Ta bort legacy motorval-konfiguration (USE_V5, USE_V6, USE_V7)
+ */
+app.delete('/api/admin/config/legacy-engine', requireAdminPassword, async (req: Request, res: Response) => {
+  try {
+    const deletedCount = await deleteLegacyEngineConfig();
+    
+    res.json({
+      success: true,
+      message: `Tog bort ${deletedCount} legacy motorval-konfigurationer`,
+      deletedKeys: ['USE_V5', 'USE_V6', 'USE_V7'].slice(0, deletedCount),
+    });
+  } catch (error: any) {
+    console.error('Error deleting legacy engine config:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Kunde inte ta bort legacy konfiguration',
+      details: error.message,
+    });
+  }
+});
+
+export default app;

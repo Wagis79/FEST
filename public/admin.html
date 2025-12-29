@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin | FEST</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header {
+            background: white;
+            border-radius: 12px;
+            padding: 20px 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header-left { display: flex; align-items: center; gap: 15px; }
+        .header-left h1 { color: #333; font-size: 1.5rem; }
+        .header-right { display: flex; align-items: center; gap: 10px; }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-secondary { background: #f0f0f0; color: #666; }
+        .btn-secondary:hover { background: #e0e0e0; color: #333; }
+        .btn-danger { background: #f44336; color: white; }
+        .btn-danger:hover { background: #d32f2f; }
+        .login-container { max-width: 400px; margin: 100px auto; }
+        .login-card {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            text-align: center;
+        }
+        .login-card h2 { color: #333; margin-bottom: 10px; font-size: 1.8rem; }
+        .login-card p { color: #666; margin-bottom: 30px; }
+        .login-input {
+            width: 100%;
+            padding: 14px 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1rem;
+            margin-bottom: 15px;
+        }
+        .login-input:focus { outline: none; border-color: #667eea; }
+        .login-btn {
+            width: 100%;
+            padding: 14px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .login-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4); }
+        .login-error { background: #ffebee; color: #c62828; padding: 12px; border-radius: 8px; margin-bottom: 15px; display: none; }
+        .dashboard { display: none; }
+        .dashboard.active { display: block; }
+        .welcome-section {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            text-align: center;
+        }
+        .welcome-section h2 { color: #333; font-size: 1.8rem; margin-bottom: 10px; }
+        .welcome-section p { color: #666; font-size: 1.1rem; }
+        .admin-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 25px; }
+        .admin-card {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transition: all 0.3s;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+            position: relative;
+            overflow: hidden;
+        }
+        .admin-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 4px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .admin-card:hover { transform: translateY(-5px); box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2); }
+        .admin-card-icon { font-size: 3rem; margin-bottom: 15px; }
+        .admin-card h3 { color: #333; font-size: 1.4rem; margin-bottom: 10px; }
+        .admin-card p { color: #666; font-size: 0.95rem; line-height: 1.5; }
+        .admin-card-badge {
+            position: absolute;
+            top: 20px; right: 20px;
+            background: #667eea;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .footer { text-align: center; margin-top: 40px; color: white; opacity: 0.8; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <div id="loginView" class="login-container">
+        <div class="login-card">
+            <div style="font-size: 4rem; margin-bottom: 20px;">🔐</div>
+            <h2>Admin Login</h2>
+            <p>Ange lösenord för att komma åt administrationen</p>
+            <div id="loginError" class="login-error">Fel lösenord. Försök igen.</div>
+            <input type="password" id="passwordInput" class="login-input" placeholder="Lösenord" onkeypress="if(event.key==='Enter') login()">
+            <button class="login-btn" onclick="login()">Logga in →</button>
+        </div>
+    </div>
+
+    <div id="dashboardView" class="dashboard container">
+        <div class="header">
+            <div class="header-left"><h1>🔧 FEST Admin</h1></div>
+            <div class="header-right">
+                <a href="/" class="btn btn-secondary">🌾 Till FEST</a>
+                <button class="btn btn-danger" onclick="logout()">Logga ut</button>
+            </div>
+        </div>
+        <div class="welcome-section">
+            <h2>Välkommen till administrationen</h2>
+            <p>Välj ett område nedan för att hantera data i FEST-systemet</p>
+        </div>
+        <div class="admin-grid">
+            <a href="/admin-products.html" class="admin-card">
+                <div class="admin-card-icon">📦</div>
+                <h3>Produkter</h3>
+                <p>Hantera gödselprodukter i databasen.</p>
+                <span class="admin-card-badge">CRUD</span>
+            </a>
+            <a href="/admin-crops.html" class="admin-card">
+                <div class="admin-card-icon">🌾</div>
+                <h3>Grödor</h3>
+                <p>Hantera grödor och näringsbehov.</p>
+                <span class="admin-card-badge">CRUD</span>
+            </a>
+            <a href="/analysis.html" class="admin-card">
+                <div class="admin-card-icon">📊</div>
+                <h3>Analys</h3>
+                <p>Se produktstatistik och insikter.</p>
+                <span class="admin-card-badge">Läsning</span>
+            </a>
+            <a href="/admin-config.html" class="admin-card">
+                <div class="admin-card-icon">⚙️</div>
+                <h3>Logik & Regler</h3>
+                <p>Konfigurera beräkningslogik.</p>
+                <span class="admin-card-badge">Konfiguration</span>
+            </a>
+        </div>
+        <div class="footer">FEST Admin v2.4.0</div>
+    </div>
+
+    <script>
+        const SESSION_KEY = 'fest_admin_session';
+        const SESSION_DURATION = 24 * 60 * 60 * 1000;
+
+        function init() {
+            if (isSessionValid()) { showDashboard(); } else { showLogin(); }
+        }
+
+        function isSessionValid() {
+            const session = sessionStorage.getItem(SESSION_KEY);
+            if (!session) return false;
+            try {
+                const data = JSON.parse(session);
+                if (Date.now() - data.timestamp > SESSION_DURATION) {
+                    sessionStorage.removeItem(SESSION_KEY);
+                    return false;
+                }
+                return true;
+            } catch { return false; }
+        }
+
+        function getStoredPassword() {
+            const session = sessionStorage.getItem(SESSION_KEY);
+            if (!session) return null;
+            try { return JSON.parse(session).password; } catch { return null; }
+        }
+
+        async function login() {
+            const password = document.getElementById('passwordInput').value;
+            const errorEl = document.getElementById('loginError');
+            if (!password) { errorEl.textContent = 'Ange ett lösenord'; errorEl.style.display = 'block'; return; }
+            try {
+                const response = await fetch('/api/admin/products', { headers: { 'X-Admin-Password': password } });
+                if (response.ok) {
+                    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ password: password, timestamp: Date.now() }));
+                    showDashboard();
+                } else {
+                    errorEl.textContent = 'Fel lösenord. Försök igen.';
+                    errorEl.style.display = 'block';
+                }
+            } catch (err) {
+                errorEl.textContent = 'Kunde inte ansluta till servern';
+                errorEl.style.display = 'block';
+            }
+        }
+
+        function logout() { sessionStorage.removeItem(SESSION_KEY); showLogin(); }
+
+        function showLogin() {
+            document.getElementById('loginView').style.display = 'block';
+            document.getElementById('dashboardView').style.display = 'none';
+            document.getElementById('passwordInput').value = '';
+            document.getElementById('loginError').style.display = 'none';
+        }
+
+        function showDashboard() {
+            document.getElementById('loginView').style.display = 'none';
+            document.getElementById('dashboardView').style.display = 'block';
+            document.getElementById('dashboardView').classList.add('active');
+        }
+
+        window.AdminSession = { isValid: isSessionValid, getPassword: getStoredPassword, logout: logout };
+        if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); } else { init(); }
+    </script>
+</body>
+</html>
