@@ -3,6 +3,7 @@
   "version": "2.4.0",
   "description": "Intelligent beslutsstöd för gödselrekommendationer med inköpslista och balanshantering",
   "scripts": {
+    "start": "node --max-old-space-size=4096 node_modules/tsx/dist/cli.mjs src/api/start.ts",
     "server": "node --max-old-space-size=12288 node_modules/tsx/dist/cli.mjs src/api/start.ts",
     "build": "tsc",
     "smoke:admin": "tsx src/api/smoke-admin.ts",
