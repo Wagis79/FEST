@@ -25,7 +25,8 @@ import {
   getCropById,
   getCropsByCategory,
   getAlgorithmConfigMap,
-  deleteLegacyEngineConfig
+  deleteLegacyEngineConfig,
+  updateProductFromM3
 } from './supabase';
 
 // Load environment variables
@@ -36,6 +37,9 @@ const PORT = process.env.PORT || 3000;
 
 // Admin password from environment
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+
+// M3 Webhook secret for ERP integration
+const M3_WEBHOOK_SECRET = process.env.M3_WEBHOOK_SECRET || '';
 
 // API Keys for external access (comma-separated in env)
 const API_KEYS = new Set(
@@ -876,6 +880,125 @@ app.delete('/api/admin/products/:id', requireAdminPassword, async (req: Request,
       success: false,
       error: 'Internal server error',
       details: error.message,
+    });
+  }
+});
+
+// =============================================================================
+// M3 WEBHOOK ENDPOINTS (ERP Integration)
+// =============================================================================
+
+/**
+ * POST /api/webhook/m3-product
+ * Webhook endpoint for M3 CE ERP integration
+ * Updates product price and/or active status based on article number
+ * 
+ * Headers:
+ *   X-Webhook-Secret: <shared secret>
+ *   Content-Type: application/json
+ * 
+ * Body:
+ * {
+ *   "itemNumber": "301763",      // Artikelnummer (matchar Produkter.Artikelnr)
+ *   "salesPrice": 4850.00,       // Nytt pris per ton (optional)
+ *   "active": true               // Om produkten är aktiv/disponibel (optional)
+ * }
+ */
+app.post('/api/webhook/m3-product', async (req: Request, res: Response) => {
+  try {
+    // Verify webhook secret
+    const webhookSecret = req.headers['x-webhook-secret'] as string;
+    
+    if (!M3_WEBHOOK_SECRET) {
+      console.error('M3 webhook: No M3_WEBHOOK_SECRET configured');
+      return res.status(503).json({
+        success: false,
+        error: 'Webhook not configured',
+        code: 'WEBHOOK_NOT_CONFIGURED'
+      });
+    }
+
+    if (!webhookSecret || webhookSecret !== M3_WEBHOOK_SECRET) {
+      console.warn('M3 webhook: Invalid or missing secret');
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid webhook secret',
+        code: 'INVALID_SECRET'
+      });
+    }
+
+    const { itemNumber, salesPrice, active } = req.body;
+
+    // Validate input
+    if (!itemNumber) {
+      return res.status(400).json({
+        success: false,
+        error: 'itemNumber is required',
+        code: 'MISSING_ITEM_NUMBER'
+      });
+    }
+
+    const artikelnr = parseInt(itemNumber.toString().replace('prod-', ''));
+    if (isNaN(artikelnr)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid itemNumber format',
+        code: 'INVALID_ITEM_NUMBER'
+      });
+    }
+
+    // Build update object
+    const updates: { price?: number; active?: boolean } = {};
+    
+    if (salesPrice !== undefined) {
+      const price = parseFloat(salesPrice);
+      if (isNaN(price) || price < 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid salesPrice',
+          code: 'INVALID_PRICE'
+        });
+      }
+      // Convert price per ton to price per kg
+      updates.price = price / 1000;
+    }
+
+    if (active !== undefined) {
+      updates.active = Boolean(active);
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No valid fields to update (salesPrice or active required)',
+        code: 'NO_UPDATES'
+      });
+    }
+
+    // Update product
+    const result = await updateProductFromM3(artikelnr, updates);
+
+    if (!result.found) {
+      return res.status(404).json({
+        success: false,
+        error: `Product with artikelnr ${artikelnr} not found`,
+        code: 'PRODUCT_NOT_FOUND'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Product updated successfully',
+      artikelnr,
+      updates
+    });
+
+  } catch (error: any) {
+    console.error('M3 webhook error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      details: error.message
     });
   }
 });

@@ -65,6 +65,7 @@ export interface DBProduct {
   Optimeringsbar?: string;
   Analysstatus?: string;
   Pris: string;
+  active?: boolean;  // Om produkten är aktiv/disponibel (från M3)
 }
 
 // Helper to parse nutrient value (handles "-" as 0)
@@ -113,6 +114,7 @@ export function dbProductToAdminProduct(dbProduct: DBProduct): any {
     notes: dbProduct.Övrigt || '',
     unit: dbProduct.Enhet || 'KG',
     optimizable: dbProduct.Optimeringsbar === 'Ja',
+    active: dbProduct.active !== false,  // Default till true om null/undefined
   };
 }
 
@@ -138,12 +140,14 @@ export function productToDBProduct(product: any): Partial<DBProduct> {
     Produktklass: product.productType || 'mineral',
     Optimeringsbar: product.optimizable ? 'Ja' : 'Nej',
     Pris: product.pricePerKg.toString().replace('.', ','),
+    active: product.active !== false,  // Default till true
   };
 }
 
 /**
  * Fetch all products from Supabase and transform to recommendation engine format
  * Prioriterar produkter med högre näringsinnehåll för bättre optimering
+ * Filtrerar bort inaktiva produkter (active = false)
  */
 export async function getAllProductsForRecommendation(): Promise<any[]> {
   try {
@@ -151,6 +155,7 @@ export async function getAllProductsForRecommendation(): Promise<any[]> {
       .from(PRODUCTS_TABLE)
       .select('*')
       .eq('Optimeringsbar', 'Ja') // Only fetch products that can be optimized
+      .neq('active', false) // Exclude inactive products (allows null = active for backwards compat)
       .order('Pris', { ascending: true }) // Sortera på pris för ekonomiska val
   .limit(500); // Hämta fler för behovsstyrt urval
 
@@ -640,6 +645,126 @@ export async function deleteLegacyEngineConfig(): Promise<number> {
     return deletedCount;
   } catch (error) {
     console.error('Exception deleting legacy config:', error);
+    throw error;
+  }
+}
+
+// =============================================================================
+// PRODUCT UPDATE FUNCTIONS (for M3 webhook integration)
+// =============================================================================
+
+/**
+ * Uppdatera produktpris baserat på artikelnummer
+ * @param artikelnr Artikelnummer från M3
+ * @param price Nytt pris per kg
+ * @returns true om produkten hittades och uppdaterades
+ */
+export async function updateProductPrice(artikelnr: number, price: number): Promise<boolean> {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from(PRODUCTS_TABLE)
+      .update({ Pris: price.toString().replace('.', ',') })
+      .eq('Artikelnr', artikelnr)
+      .select();
+
+    if (error) {
+      console.error('Error updating product price:', error);
+      throw error;
+    }
+
+    const updated = data && data.length > 0;
+    if (updated) {
+      console.log(`💰 Uppdaterade pris för artikel ${artikelnr}: ${price} kr/kg`);
+    } else {
+      console.warn(`⚠️  Artikel ${artikelnr} hittades inte`);
+    }
+    return updated;
+  } catch (error) {
+    console.error('Exception updating product price:', error);
+    throw error;
+  }
+}
+
+/**
+ * Uppdatera produktens aktiv-status baserat på artikelnummer
+ * @param artikelnr Artikelnummer från M3
+ * @param active Om produkten är aktiv/disponibel
+ * @returns true om produkten hittades och uppdaterades
+ */
+export async function updateProductActiveStatus(artikelnr: number, active: boolean): Promise<boolean> {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from(PRODUCTS_TABLE)
+      .update({ active })
+      .eq('Artikelnr', artikelnr)
+      .select();
+
+    if (error) {
+      console.error('Error updating product active status:', error);
+      throw error;
+    }
+
+    const updated = data && data.length > 0;
+    if (updated) {
+      console.log(`${active ? '✅' : '❌'} Artikel ${artikelnr} markerad som ${active ? 'aktiv' : 'inaktiv'}`);
+    } else {
+      console.warn(`⚠️  Artikel ${artikelnr} hittades inte`);
+    }
+    return updated;
+  } catch (error) {
+    console.error('Exception updating product active status:', error);
+    throw error;
+  }
+}
+
+/**
+ * Uppdatera produkt från M3 webhook (pris och/eller aktiv-status)
+ * @param artikelnr Artikelnummer från M3
+ * @param updates Fält att uppdatera
+ * @returns Resultat av uppdateringen
+ */
+export async function updateProductFromM3(
+  artikelnr: number, 
+  updates: { price?: number; active?: boolean }
+): Promise<{ found: boolean; updated: boolean; artikelnr: number }> {
+  try {
+    const updateData: Record<string, any> = {};
+    
+    if (updates.price !== undefined) {
+      updateData.Pris = updates.price.toString().replace('.', ',');
+    }
+    if (updates.active !== undefined) {
+      updateData.active = updates.active;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return { found: false, updated: false, artikelnr };
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from(PRODUCTS_TABLE)
+      .update(updateData)
+      .eq('Artikelnr', artikelnr)
+      .select();
+
+    if (error) {
+      console.error('Error updating product from M3:', error);
+      throw error;
+    }
+
+    const found = data && data.length > 0;
+    if (found) {
+      const changes: string[] = [];
+      if (updates.price !== undefined) changes.push(`pris=${updates.price}`);
+      if (updates.active !== undefined) changes.push(`active=${updates.active}`);
+      console.log(`🔄 M3 uppdatering för artikel ${artikelnr}: ${changes.join(', ')}`);
+    } else {
+      console.warn(`⚠️  M3 webhook: Artikel ${artikelnr} hittades inte i FEST-databasen`);
+    }
+
+    return { found, updated: found, artikelnr };
+  } catch (error) {
+    console.error('Exception in updateProductFromM3:', error);
     throw error;
   }
 }
