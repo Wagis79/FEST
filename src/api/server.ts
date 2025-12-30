@@ -987,6 +987,12 @@ app.post('/api/admin/crops', requireAdminPassword, async (req: Request, res: Res
     const { createCrop } = await import('./supabase');
     
     // Validate required fields
+    if (!req.body.id) {
+      return res.status(400).json({
+        success: false,
+        error: 'ID är obligatoriskt (id) - använd beskrivande format, t.ex. "spring_barley_malt"',
+      });
+    }
     if (!req.body.name) {
       return res.status(400).json({
         success: false,
@@ -994,11 +1000,8 @@ app.post('/api/admin/crops', requireAdminPassword, async (req: Request, res: Res
       });
     }
     
-    // Generate ID if not provided
-    const generatedId = req.body.id || `crop-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
     const cropData = {
-      id: generatedId,
+      id: req.body.id,
       name: req.body.name,
       category: req.body.category || 'other',
       unit: req.body.unit || 'ton',

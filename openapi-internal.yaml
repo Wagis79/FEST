@@ -596,10 +596,58 @@ components:
 
     CropInput:
       type: object
+      required:
+        - id
+        - name
       properties:
+        id:
+          type: string
+          description: Unikt ID (beskrivande format, t.ex. "spring_barley_malt")
+          example: winter_wheat_bread
         name:
           type: string
+          description: Visningsnamn för grödan
+          example: Höstvete bröd
         category:
           type: string
-        nutrientRequirements:
-          $ref: '#/components/schemas/NutrientNeed'
+          description: Grödkategori
+          enum: [spannmal, oljevaxte, grovfoder, rotfrukter, ovriga, other]
+          default: other
+        unit:
+          type: string
+          description: Enhet för skörd
+          enum: [ton, TON_GRAIN, TON_SEED, TON_TS, TON_ROOT, TON_TUBER, kg]
+          default: ton
+        n_per_ton:
+          type: number
+          description: Kg N per ton skörd
+        p_per_ton:
+          type: number
+          description: Kg P per ton skörd
+        k_per_ton:
+          type: number
+          description: Kg K per ton skörd
+        s_per_ton:
+          type: number
+          description: Kg S per ton skörd
+        yield_min:
+          type: number
+          description: Lägsta förväntad skörd (ton/ha)
+        yield_max:
+          type: number
+          description: Högsta förväntad skörd (ton/ha)
+        yield_average:
+          type: number
+          description: Normal skörd (ton/ha)
+        precrop_n_effect:
+          type: number
+          description: Förfruktsvärde N (kg/ha)
+        precrop_yield_effect:
+          type: number
+          description: Förfruktsvärde skörd (kg/ha)
+        description:
+          type: string
+        source_provider:
+          type: string
+          default: Manuellt tillagd
+
