@@ -146,7 +146,7 @@ paths:
               basic:
                 summary: Höstvete 8.5 ton/ha
                 value:
-                  cropId: "wheat-winter"
+                  cropId: "winter_wheat_bread"
                   yieldTonPerHa: 8.5
       responses:
         '200':
