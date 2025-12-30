@@ -1,0 +1,603 @@
+openapi: 3.0.3
+info:
+  title: FEST API - Intern Dokumentation
+  description: |
+    Komplett intern API-dokumentation för FEST Gödseloptimering.
+    
+    ## Autentisering
+    
+    | Endpoint-typ | Header | Beskrivning |
+    |--------------|--------|-------------|
+    | Externa endpoints | `X-API-Key` | API-nyckel för partners |
+    | Admin endpoints | `X-Admin-Password` | Admin-lösenord |
+    | Interna endpoints | Ingen | Endast tillgängliga utan API-nyckel |
+    
+    ## Endpoints per åtkomstnivå
+    
+    - **Öppen**: `/health`
+    - **Extern (API-nyckel)**: `/api/recommend`, `/api/products`, `/api/crops`, `/api/calculate-need`
+    - **Intern**: `/api/optimize-v5`, `/api/optimize-v7`
+    - **Admin**: `/api/admin/*`
+  version: 1.0.0
+  contact:
+    name: FEST Development Team
+
+servers:
+  - url: http://localhost:3000
+    description: Lokal utvecklingsserver
+
+tags:
+  - name: System
+    description: Systemstatus
+  - name: Optimering
+    description: Alla optimeringsendpoints
+  - name: Grödor
+    description: Grödor och behovsberäkning
+  - name: Produkter
+    description: Gödselprodukter
+  - name: Admin
+    description: Administrationsendpoints (kräver admin-lösenord)
+
+paths:
+  # ============================================================================
+  # SYSTEM
+  # ============================================================================
+  /health:
+    get:
+      tags: [System]
+      summary: Health check
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Servern är igång
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: string
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  # ============================================================================
+  # OPTIMERING - EXTERN
+  # ============================================================================
+  /api/recommend:
+    post:
+      tags: [Optimering]
+      summary: Få gödselrekommendationer (extern)
+      description: Huvudendpoint för extern gödseloptimering
+      operationId: getRecommendations
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecommendRequest'
+      responses:
+        '200':
+          description: Lyckad optimering
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecommendResponse'
+
+  # ============================================================================
+  # OPTIMERING - INTERN
+  # ============================================================================
+  /api/optimize-v5:
+    post:
+      tags: [Optimering]
+      summary: MILP-optimering V5 (intern)
+      description: |
+        **⚠️ Endast intern användning** - Blockerad för externa API-anrop.
+        
+        Enklare MILP-optimering utan prispall.
+      operationId: optimizeV5
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OptimizeV5Request'
+      responses:
+        '200':
+          description: Lyckad optimering
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OptimizeV5Response'
+
+  /api/optimize-v7:
+    post:
+      tags: [Optimering]
+      summary: Avancerad MILP-optimering V7 (intern)
+      description: |
+        **⚠️ Endast intern användning** - Blockerad för externa API-anrop.
+        
+        Avancerad optimering med:
+        - Prispall med 3 strategier via no-good cuts
+        - N: exakt target..target+tolerans
+        - P/K/S: 85%-125% av target
+        - Varningar för ej aktiverade ämnen med hög nivå
+      operationId: optimizeV7
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OptimizeV7Request'
+      responses:
+        '200':
+          description: Lyckad optimering
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OptimizeV7Response'
+
+  # ============================================================================
+  # GRÖDOR
+  # ============================================================================
+  /api/crops:
+    get:
+      tags: [Grödor]
+      summary: Hämta alla grödor
+      operationId: getCrops
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+            enum: [cereals, oilseeds, legumes, root_crops, grass, other]
+      responses:
+        '200':
+          description: Lista med grödor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CropsResponse'
+
+  /api/calculate-need:
+    post:
+      tags: [Grödor]
+      summary: Beräkna näringsbehov
+      operationId: calculateNeed
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CalculateNeedRequest'
+      responses:
+        '200':
+          description: Beräknat näringsbehov
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalculateNeedResponse'
+
+  # ============================================================================
+  # PRODUKTER
+  # ============================================================================
+  /api/products:
+    get:
+      tags: [Produkter]
+      summary: Hämta alla produkter
+      operationId: getProducts
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Lista med produkter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductsResponse'
+
+  # ============================================================================
+  # ADMIN
+  # ============================================================================
+  /api/admin/products:
+    get:
+      tags: [Admin]
+      summary: Hämta alla produkter (admin-vy)
+      operationId: adminGetProducts
+      security:
+        - AdminAuth: []
+      responses:
+        '200':
+          description: Lista med produkter inkl. admin-fält
+    post:
+      tags: [Admin]
+      summary: Skapa ny produkt
+      operationId: adminCreateProduct
+      security:
+        - AdminAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminProductInput'
+      responses:
+        '201':
+          description: Produkt skapad
+
+  /api/admin/products/{id}:
+    put:
+      tags: [Admin]
+      summary: Uppdatera produkt
+      operationId: adminUpdateProduct
+      security:
+        - AdminAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminProductInput'
+      responses:
+        '200':
+          description: Produkt uppdaterad
+    delete:
+      tags: [Admin]
+      summary: Ta bort produkt
+      operationId: adminDeleteProduct
+      security:
+        - AdminAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Produkt borttagen
+
+  /api/admin/crops:
+    get:
+      tags: [Admin]
+      summary: Hämta alla grödor (admin-vy)
+      operationId: adminGetCrops
+      security:
+        - AdminAuth: []
+      responses:
+        '200':
+          description: Lista med grödor
+    post:
+      tags: [Admin]
+      summary: Skapa ny gröda
+      operationId: adminCreateCrop
+      security:
+        - AdminAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CropInput'
+      responses:
+        '201':
+          description: Gröda skapad
+
+  /api/admin/crops/{id}:
+    put:
+      tags: [Admin]
+      summary: Uppdatera gröda
+      operationId: adminUpdateCrop
+      security:
+        - AdminAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CropInput'
+      responses:
+        '200':
+          description: Gröda uppdaterad
+    delete:
+      tags: [Admin]
+      summary: Ta bort gröda
+      operationId: adminDeleteCrop
+      security:
+        - AdminAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Gröda borttagen
+
+  /api/admin/config:
+    get:
+      tags: [Admin]
+      summary: Hämta algoritmkonfiguration
+      operationId: adminGetConfig
+      security:
+        - AdminAuth: []
+      responses:
+        '200':
+          description: Konfigurationsparametrar
+    put:
+      tags: [Admin]
+      summary: Uppdatera algoritmkonfiguration
+      operationId: adminUpdateConfig
+      security:
+        - AdminAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Konfiguration uppdaterad
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API-nyckel för extern åtkomst
+    AdminAuth:
+      type: apiKey
+      in: header
+      name: X-Admin-Password
+      description: Admin-lösenord
+
+  schemas:
+    NutrientNeed:
+      type: object
+      properties:
+        N:
+          type: number
+          description: Kvävebehov (kg/ha)
+        P:
+          type: number
+          description: Fosforbehov (kg/ha)
+        K:
+          type: number
+          description: Kaliumbehov (kg/ha)
+        S:
+          type: number
+          description: Svavelbehov (kg/ha)
+
+    RecommendRequest:
+      type: object
+      required: [need]
+      properties:
+        need:
+          $ref: '#/components/schemas/NutrientNeed'
+        requiredNutrients:
+          type: array
+          items:
+            type: string
+            enum: [N, P, K, S]
+        maxProducts:
+          type: integer
+          minimum: 1
+          maximum: 5
+          default: 3
+        topN:
+          type: integer
+          default: 10
+        strategy:
+          type: string
+          enum: [economic, optimized]
+          default: economic
+        excludedProductIds:
+          type: array
+          items:
+            type: string
+
+    RecommendResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        count:
+          type: integer
+        solutions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Solution'
+
+    Solution:
+      type: object
+      properties:
+        products:
+          type: array
+          items:
+            type: object
+            properties:
+              productId:
+                type: string
+              name:
+                type: string
+              kgPerHa:
+                type: number
+        supplied:
+          $ref: '#/components/schemas/NutrientNeed'
+        costPerHa:
+          type: number
+
+    OptimizeV5Request:
+      type: object
+      required: [targets]
+      properties:
+        targets:
+          $ref: '#/components/schemas/NutrientNeed'
+        mustFlags:
+          type: object
+          properties:
+            mustN:
+              type: boolean
+            mustP:
+              type: boolean
+            mustK:
+              type: boolean
+            mustS:
+              type: boolean
+        maxProducts:
+          type: integer
+          default: 2
+
+    OptimizeV5Response:
+      type: object
+      properties:
+        success:
+          type: boolean
+        status:
+          type: string
+        cost:
+          type: number
+        products:
+          type: array
+          items:
+            type: object
+
+    OptimizeV7Request:
+      type: object
+      required: [targets]
+      properties:
+        targets:
+          $ref: '#/components/schemas/NutrientNeed'
+        mustFlags:
+          type: object
+          properties:
+            mustN:
+              type: boolean
+            mustP:
+              type: boolean
+            mustK:
+              type: boolean
+            mustS:
+              type: boolean
+        maxProducts:
+          type: integer
+          default: 2
+        minDose:
+          type: number
+          default: 100
+        maxDose:
+          type: number
+          default: 600
+
+    OptimizeV7Response:
+      type: object
+      properties:
+        success:
+          type: boolean
+        status:
+          type: string
+        strategies:
+          type: array
+          items:
+            type: object
+            properties:
+              rank:
+                type: integer
+              cost:
+                type: number
+              products:
+                type: array
+                items:
+                  type: object
+              supplied:
+                $ref: '#/components/schemas/NutrientNeed'
+
+    CalculateNeedRequest:
+      type: object
+      required: [cropId, yieldTonPerHa]
+      properties:
+        cropId:
+          type: string
+        yieldTonPerHa:
+          type: number
+        precropId:
+          type: string
+
+    CalculateNeedResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        crop:
+          type: string
+        need:
+          $ref: '#/components/schemas/NutrientNeed'
+
+    ProductsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        count:
+          type: integer
+        products:
+          type: array
+          items:
+            type: object
+
+    CropsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        count:
+          type: integer
+        crops:
+          type: array
+          items:
+            type: object
+
+    AdminProductInput:
+      type: object
+      properties:
+        name:
+          type: string
+        pricePerKg:
+          type: number
+        nutrients:
+          $ref: '#/components/schemas/NutrientNeed'
+        active:
+          type: boolean
+
+    CropInput:
+      type: object
+      properties:
+        name:
+          type: string
+        category:
+          type: string
+        nutrientRequirements:
+          $ref: '#/components/schemas/NutrientNeed'

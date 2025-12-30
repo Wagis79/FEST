@@ -1,0 +1,299 @@
+openapi: 3.0.3
+info:
+  title: FEST Gödseloptimerings-API
+  description: |
+    REST API för optimering av gödselblandningar baserat på näringsbehov.
+    
+    ## Funktioner
+    - 🎯 **Behovsbaserad optimering** - Skicka in näringsbehov (N, P, K, S) och få optimerade produktförslag
+    - 💰 **Kostnadsminimering** - Hittar den billigaste produktkombinationen som täcker behoven
+    - 🌾 **Grödobaserad beräkning** - Beräkna näringsbehov från gröda och förväntad skörd
+    - 📊 **Produktkatalog** - Lista tillgängliga gödselprodukter
+    
+    ## Autentisering
+    Alla API-endpoints kräver en giltig API-nyckel som skickas i headern `X-API-Key`.
+    
+    ## Begränsningar
+    - Endast läsoperationer och beräkningar är tillgängliga
+    - Inga skriv- eller ändringsoperationer
+  version: 1.0.0
+  contact:
+    name: FEST API Support
+  license:
+    name: Proprietary
+
+servers:
+  - url: https://your-production-server.com
+    description: Produktionsserver
+
+tags:
+  - name: Optimering
+    description: Gödselrekommendationer och optimering
+  - name: Grödor
+    description: Grödor och behovsberäkning
+  - name: Produkter
+    description: Gödselprodukter
+  - name: System
+    description: Systemstatus
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  /health:
+    get:
+      tags: [System]
+      summary: Health check
+      description: Kontrollerar att servern är igång
+      operationId: healthCheck
+      security: []
+      responses:
+        '200':
+          description: Servern är igång
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  status:
+                    type: string
+                    example: OK
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /api/recommend:
+    post:
+      tags: [Optimering]
+      summary: Få gödselrekommendationer
+      description: |
+        Huvudendpoint för gödseloptimering. Tar emot näringsbehov och returnerar 
+        kostnadsoptimerade produktkombinationer.
+      operationId: getRecommendations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecommendRequest'
+            examples:
+              basic:
+                summary: Enkel rekommendation
+                value:
+                  need:
+                    N: 150
+                    P: 25
+                    K: 40
+                    S: 15
+                  requiredNutrients: ["N", "P", "K", "S"]
+                  maxProducts: 3
+      responses:
+        '200':
+          description: Lyckad optimering
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecommendResponse'
+        '400':
+          description: Ogiltig input
+        '401':
+          description: API-nyckel saknas
+        '403':
+          description: Ogiltig API-nyckel
+
+  /api/crops:
+    get:
+      tags: [Grödor]
+      summary: Hämta alla grödor
+      description: Returnerar alla tillgängliga grödor med deras näringskrav
+      operationId: getCrops
+      parameters:
+        - name: category
+          in: query
+          description: Filtrera på grödkategori
+          required: false
+          schema:
+            type: string
+            enum: [cereals, oilseeds, legumes, root_crops, grass, other]
+      responses:
+        '200':
+          description: Lista med grödor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CropsResponse'
+
+  /api/calculate-need:
+    post:
+      tags: [Grödor]
+      summary: Beräkna näringsbehov
+      description: |
+        Beräknar näringsbehov baserat på vald gröda och förväntad skörd.
+        Kan även ta hänsyn till förfruktseffekter.
+      operationId: calculateNeed
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CalculateNeedRequest'
+            examples:
+              basic:
+                summary: Höstvete 8.5 ton/ha
+                value:
+                  cropId: "wheat-winter"
+                  yieldTonPerHa: 8.5
+      responses:
+        '200':
+          description: Beräknat näringsbehov
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalculateNeedResponse'
+        '400':
+          description: Ogiltig input
+        '404':
+          description: Gröda hittades inte
+
+  /api/products:
+    get:
+      tags: [Produkter]
+      summary: Hämta alla produkter
+      description: Returnerar alla tillgängliga gödselprodukter
+      operationId: getProducts
+      responses:
+        '200':
+          description: Lista med produkter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductsResponse'
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API-nyckel för extern åtkomst
+
+  schemas:
+    NutrientNeed:
+      type: object
+      properties:
+        N:
+          type: number
+          description: Kvävebehov (kg/ha)
+        P:
+          type: number
+          description: Fosforbehov (kg/ha)
+        K:
+          type: number
+          description: Kaliumbehov (kg/ha)
+        S:
+          type: number
+          description: Svavelbehov (kg/ha)
+
+    RecommendRequest:
+      type: object
+      required: [need]
+      properties:
+        need:
+          $ref: '#/components/schemas/NutrientNeed'
+        requiredNutrients:
+          type: array
+          items:
+            type: string
+            enum: [N, P, K, S]
+        maxProducts:
+          type: integer
+          minimum: 1
+          maximum: 5
+          default: 3
+        topN:
+          type: integer
+          default: 10
+        strategy:
+          type: string
+          enum: [economic, optimized]
+          default: economic
+        excludedProductIds:
+          type: array
+          items:
+            type: string
+
+    RecommendResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        count:
+          type: integer
+        solutions:
+          type: array
+          items:
+            type: object
+            properties:
+              products:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    productId:
+                      type: string
+                    name:
+                      type: string
+                    kgPerHa:
+                      type: number
+              supplied:
+                $ref: '#/components/schemas/NutrientNeed'
+              costPerHa:
+                type: number
+
+    CalculateNeedRequest:
+      type: object
+      required: [cropId, yieldTonPerHa]
+      properties:
+        cropId:
+          type: string
+        yieldTonPerHa:
+          type: number
+        precropId:
+          type: string
+
+    CalculateNeedResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        crop:
+          type: string
+        need:
+          $ref: '#/components/schemas/NutrientNeed'
+
+    ProductsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        count:
+          type: integer
+        products:
+          type: array
+          items:
+            type: object
+
+    CropsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        count:
+          type: integer
+        crops:
+          type: array
+          items:
+            type: object

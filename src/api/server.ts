@@ -3,6 +3,8 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
+import swaggerUi from 'swagger-ui-express';
+import YAML from 'yaml';
 import { calculateNutrientNeed, calculateNutrientNeedWithPrecrop, Crop } from '../data/crops';
 import { recommend, RecommendOptions } from '../engine/recommend';
 import { optimizeV5, OptimizeV5Input, OptimizeV5Output } from '../engine/optimize-v5';
@@ -35,7 +37,22 @@ const PORT = process.env.PORT || 3000;
 // Admin password from environment
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
-// Simple password check middleware
+// API Keys for external access (comma-separated in env)
+const API_KEYS = new Set(
+  (process.env.API_KEYS || '')
+    .split(',')
+    .map(key => key.trim())
+    .filter(key => key.length > 0)
+);
+
+// Log API key status on startup
+if (API_KEYS.size > 0) {
+  console.log(`🔑 ${API_KEYS.size} API-nyckel(ar) konfigurerade`);
+} else {
+  console.log('⚠️  Inga API-nycklar konfigurerade - externt API-åtkomst är öppen');
+}
+
+// Simple password check middleware for admin
 function requireAdminPassword(req: Request, res: Response, next: NextFunction) {
   const password = req.headers['x-admin-password'];
   
@@ -49,9 +66,113 @@ function requireAdminPassword(req: Request, res: Response, next: NextFunction) {
   }
 }
 
+/**
+ * API Key middleware for external API access
+ * Checks X-API-Key header against configured keys
+ * If no keys are configured, access is open (for development)
+ */
+function requireApiKey(req: Request, res: Response, next: NextFunction) {
+  // If no API keys configured, allow access (development mode)
+  if (API_KEYS.size === 0) {
+    return next();
+  }
+
+  const apiKey = req.headers['x-api-key'] as string;
+
+  if (!apiKey) {
+    return res.status(401).json({
+      success: false,
+      error: 'API-nyckel saknas. Lägg till header: X-API-Key',
+      code: 'MISSING_API_KEY'
+    });
+  }
+
+  if (!API_KEYS.has(apiKey)) {
+    return res.status(403).json({
+      success: false,
+      error: 'Ogiltig API-nyckel',
+      code: 'INVALID_API_KEY'
+    });
+  }
+
+  // Valid API key - proceed
+  next();
+}
+
+/**
+ * Middleware to block external access completely
+ * Only allows requests from localhost or without API key header
+ * Used for internal endpoints that should not be exposed externally
+ */
+function blockExternalAccess(req: Request, res: Response, next: NextFunction) {
+  // If no API keys configured, we're in development mode - allow all
+  if (API_KEYS.size === 0) {
+    return next();
+  }
+
+  // If request has an API key, it's an external request - block it
+  const apiKey = req.headers['x-api-key'] as string;
+  if (apiKey) {
+    return res.status(403).json({
+      success: false,
+      error: 'Denna endpoint är inte tillgänglig för externa API-anrop',
+      code: 'ENDPOINT_NOT_AVAILABLE'
+    });
+  }
+
+  // No API key = internal request (from our own frontend) - allow
+  next();
+}
+
 // Global Middleware
 app.use(cors());
 app.use(express.json());
+
+// Swagger UI - API Documentation
+// Using separate routers to avoid conflicts between multiple swagger instances
+try {
+  // External API docs (for partners) - hide schemas section
+  const openapiPath = path.join(__dirname, '../../openapi.yaml');
+  if (fs.existsSync(openapiPath)) {
+    const openapiFile = fs.readFileSync(openapiPath, 'utf8');
+    const swaggerDocument = YAML.parse(openapiFile);
+    
+    const externalSwaggerOptions = {
+      customCss: `
+        .swagger-ui .topbar { display: none }
+        .swagger-ui .models { display: none }
+      `,
+      customSiteTitle: 'FEST API - Extern',
+      swaggerOptions: {
+        defaultModelsExpandDepth: -1,
+        docExpansion: 'list'
+      }
+    };
+    
+    app.use('/api-docs', swaggerUi.serveFiles(swaggerDocument, externalSwaggerOptions), swaggerUi.setup(swaggerDocument, externalSwaggerOptions));
+    console.log('📚 Swagger UI (extern) available at /api-docs');
+  }
+
+  // Internal API docs (complete documentation)
+  const openapiInternalPath = path.join(__dirname, '../../openapi-internal.yaml');
+  if (fs.existsSync(openapiInternalPath)) {
+    const openapiInternalFile = fs.readFileSync(openapiInternalPath, 'utf8');
+    const swaggerInternalDocument = YAML.parse(openapiInternalFile);
+    
+    const internalSwaggerOptions = {
+      customCss: '.swagger-ui .topbar { display: none }',
+      customSiteTitle: 'FEST API - Intern',
+      swaggerOptions: {
+        docExpansion: 'list'
+      }
+    };
+    
+    app.use('/api-docs-internal', swaggerUi.serveFiles(swaggerInternalDocument, internalSwaggerOptions), swaggerUi.setup(swaggerInternalDocument, internalSwaggerOptions));
+    console.log('📚 Swagger UI (intern) available at /api-docs-internal');
+  }
+} catch (err) {
+  console.warn('⚠️  Could not load OpenAPI spec for Swagger UI:', err);
+}
 
 // Public static files
 app.use(express.static(path.join(__dirname, '../../public')));
@@ -64,8 +185,9 @@ app.get('/', (req: Request, res: Response) => {
 /**
  * GET /api/products
  * Returnera alla tillgängliga produkter (för rekommendationsmotorn)
+ * Tillgänglig för externa API-anrop (endast läsning)
  */
-app.get('/api/products', async (req: Request, res: Response) => {
+app.get('/api/products', requireApiKey, async (req: Request, res: Response) => {
   try {
     const products = await getAllProductsForRecommendation();
     res.json({
@@ -85,6 +207,7 @@ app.get('/api/products', async (req: Request, res: Response) => {
 /**
  * POST /api/recommend
  * Få rekommendationer baserat på näringsbehov
+ * Kräver API-nyckel för extern åtkomst (om konfigurerat)
  * 
  * Body: {
  *   need: { N?: number, P?: number, K?: number, S?: number },
@@ -93,7 +216,7 @@ app.get('/api/products', async (req: Request, res: Response) => {
  *   topN?: number
  * }
  */
-app.post('/api/recommend', async (req: Request, res: Response) => {
+app.post('/api/recommend', requireApiKey, async (req: Request, res: Response) => {
   try {
   const { need, strategy = 'economic', maxProducts, topN = 10, requiredNutrients, excludedProductIds } = req.body;
 
@@ -202,7 +325,7 @@ app.post('/api/recommend', async (req: Request, res: Response) => {
  * 
  * Returnerar prispall med upp till 3 strategier (billigaste produktmixar)
  */
-app.post('/api/optimize-v5', async (req: Request, res: Response) => {
+app.post('/api/optimize-v5', blockExternalAccess, async (req: Request, res: Response) => {
   try {
     const { 
       targets, 
@@ -318,7 +441,7 @@ app.post('/api/optimize-v5', async (req: Request, res: Response) => {
  * - Prispall med 3 strategier via no-good cuts
  * - Warnings för ej aktiverade ämnen med hög nivå
  */
-app.post('/api/optimize-v7', async (req: Request, res: Response) => {
+app.post('/api/optimize-v7', blockExternalAccess, async (req: Request, res: Response) => {
   try {
     const { 
       targets, 
@@ -409,8 +532,9 @@ app.post('/api/optimize-v7', async (req: Request, res: Response) => {
 /**
  * GET /api/crops
  * Returnera alla tillgängliga grödor från Supabase
+ * Tillgänglig för externa API-anrop (endast läsning)
  */
-app.get('/api/crops', async (req: Request, res: Response) => {
+app.get('/api/crops', requireApiKey, async (req: Request, res: Response) => {
   try {
     const category = req.query.category as string | undefined;
     
@@ -446,6 +570,7 @@ app.get('/api/crops', async (req: Request, res: Response) => {
 /**
  * POST /api/calculate-need
  * Beräkna näringsbehov från gröda och skörd
+ * Tillgänglig för externa API-anrop (endast läsning/beräkning)
  * 
  * Body: {
  *   cropId: string,
@@ -453,7 +578,7 @@ app.get('/api/crops', async (req: Request, res: Response) => {
  *   precropId?: string  // Valfri förfrukt
  * }
  */
-app.post('/api/calculate-need', async (req: Request, res: Response) => {
+app.post('/api/calculate-need', requireApiKey, async (req: Request, res: Response) => {
   try {
     const { cropId, yieldTonPerHa, precropId } = req.body;
 
@@ -537,7 +662,7 @@ app.use('/api/admin', requireAdminPassword);
  * GET /api/admin/products
  * Fetch all products from Supabase database
  */
-app.get('/api/admin/products', async (req: Request, res: Response) => {
+app.get('/api/admin/products', requireAdminPassword, async (req: Request, res: Response) => {
   try {
     const { data, error } = await supabase
       .from(PRODUCTS_TABLE)
@@ -569,7 +694,7 @@ app.get('/api/admin/products', async (req: Request, res: Response) => {
  * POST /api/admin/products
  * Add a new product to Supabase database
  */
-app.post('/api/admin/products', async (req: Request, res: Response) => {
+app.post('/api/admin/products', requireAdminPassword, async (req: Request, res: Response) => {
   try {
     const product = req.body;
 
@@ -627,7 +752,7 @@ app.post('/api/admin/products', async (req: Request, res: Response) => {
  * PUT /api/admin/products/:id
  * Update an existing product in Supabase database
  */
-app.put('/api/admin/products/:id', async (req: Request, res: Response) => {
+app.put('/api/admin/products/:id', requireAdminPassword, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const product = req.body;
@@ -691,7 +816,7 @@ app.put('/api/admin/products/:id', async (req: Request, res: Response) => {
  * DELETE /api/admin/products/:id
  * Delete a product from Supabase database
  */
-app.delete('/api/admin/products/:id', async (req: Request, res: Response) => {
+app.delete('/api/admin/products/:id', requireAdminPassword, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 

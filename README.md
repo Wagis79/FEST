@@ -37,10 +37,50 @@ open http://localhost:3000
 Skapa `.env` i projektets rot:
 
 ```env
+# Supabase
 SUPABASE_URL=https://xxxx.supabase.co
 SUPABASE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+# Server
 PORT=3000
+
+# Säkerhet (produktion)
+ADMIN_PASSWORD=ditt-admin-lösenord
+API_KEYS=nyckel1,nyckel2,nyckel3
 ```
+
+---
+
+## API-säkerhet
+
+### Åtkomstnivåer
+
+| Endpoint | Autentisering | Beskrivning |
+|----------|---------------|-------------|
+| `/health` | Ingen | Hälsokontroll |
+| `/api/recommend` | API-nyckel | Gödseloptimering |
+| `/api/products` | API-nyckel | Läs produkter |
+| `/api/crops` | API-nyckel | Läs grödor |
+| `/api/calculate-need` | API-nyckel | Beräkna näringsbehov |
+| `/api/admin/*` | Admin-lösenord | Databashantering |
+| `/api/optimize-v*` | Blockerad externt | Interna optimerare |
+
+### API-nyckel (extern åtkomst)
+
+```bash
+curl -H "X-API-Key: din-nyckel" http://localhost:3000/api/products
+```
+
+### Admin-lösenord (databasändringar)
+
+```bash
+curl -H "X-Admin-Password: ditt-lösenord" http://localhost:3000/api/admin/products
+```
+
+### Swagger UI
+
+- **Extern dokumentation:** `/api-docs`
+- **Intern dokumentation:** `/api-docs-internal`
 
 ---
 

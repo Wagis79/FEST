@@ -2,6 +2,34 @@
 
 Alla viktiga ändringar i projektet dokumenteras här.
 
+## [2.5.0] - 2025-12-30
+
+### 🔐 API-säkerhet och extern åtkomst
+
+#### Ny funktionalitet
+- **API-nyckel-autentisering** - Externa partners kan använda API:et med `X-API-Key` header
+- **Swagger UI** - Interaktiv API-dokumentation på `/api-docs` (extern) och `/api-docs-internal` (intern)
+- **OpenAPI 3.0-specifikationer** - `openapi.yaml` (extern) och `openapi-internal.yaml` (intern)
+- **Extern API-dokumentation** - `API_EXTERNAL.md` för partners
+
+#### Säkerhetsförbättringar
+- Alla admin-endpoints kräver nu `X-Admin-Password` header
+- Interna optimerings-endpoints (`/api/optimize-v*`) blockerade för externa API-anrop
+- Externa endpoints: `/api/recommend`, `/api/products`, `/api/crops`, `/api/calculate-need`
+
+#### Nya filer
+- `API_DOCUMENTATION.md` - Intern API-referens
+- `API_EXTERNAL.md` - Partner-dokumentation
+- `API_CROSSREF_REPORT.md` - Korsreferens kod ↔ dokumentation
+- `openapi.yaml` - Extern OpenAPI-spec (5 endpoints)
+- `openapi-internal.yaml` - Intern OpenAPI-spec (alla endpoints)
+
+#### Miljövariabler
+- `API_KEYS` - Kommaseparerad lista med giltiga API-nycklar
+- `ADMIN_PASSWORD` - Lösenord för admin-endpoints
+
+---
+
 ## [2.4.1] - 2025-12-29
 
 ### 🧹 Kodstädning och dokumentationsförenkling
