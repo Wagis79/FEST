@@ -986,22 +986,33 @@ app.post('/api/admin/crops', requireAdminPassword, async (req: Request, res: Res
   try {
     const { createCrop } = await import('./supabase');
     
+    // Validate required fields
+    if (!req.body.name) {
+      return res.status(400).json({
+        success: false,
+        error: 'Namn är obligatoriskt (name)',
+      });
+    }
+    
+    // Generate ID if not provided
+    const generatedId = req.body.id || `crop-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
     const cropData = {
-      id: req.body.id,
+      id: generatedId,
       name: req.body.name,
-      category: req.body.category,
-      unit: req.body.unit,
-      n_per_ton: req.body.n_per_ton,
-      p_per_ton: req.body.p_per_ton,
-      k_per_ton: req.body.k_per_ton,
+      category: req.body.category || 'other',
+      unit: req.body.unit || 'ton',
+      n_per_ton: req.body.n_per_ton ?? 0,
+      p_per_ton: req.body.p_per_ton ?? 0,
+      k_per_ton: req.body.k_per_ton ?? 0,
       s_per_ton: req.body.s_per_ton || null,
-      yield_min: req.body.yield_min,
-      yield_max: req.body.yield_max,
-      yield_average: req.body.yield_average,
-      precrop_n_effect: req.body.precrop_n_effect,
-      precrop_yield_effect: req.body.precrop_yield_effect,
+      yield_min: req.body.yield_min ?? 0,
+      yield_max: req.body.yield_max ?? 10,
+      yield_average: req.body.yield_average ?? 5,
+      precrop_n_effect: req.body.precrop_n_effect ?? 0,
+      precrop_yield_effect: req.body.precrop_yield_effect ?? 0,
       description: req.body.description || null,
-      source_provider: req.body.source_provider || 'Jordbruksverket',
+      source_provider: req.body.source_provider || 'Manuellt tillagd',
       source_note: req.body.source_note || null,
     };
     
