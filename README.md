@@ -47,6 +47,9 @@ PORT=3000
 # Säkerhet (produktion)
 ADMIN_PASSWORD=ditt-admin-lösenord
 API_KEYS=nyckel1,nyckel2,nyckel3
+
+# M3 ERP-integration
+M3_WEBHOOK_SECRET=hemlig-webhook-nyckel
 ```
 
 ---
@@ -63,6 +66,7 @@ API_KEYS=nyckel1,nyckel2,nyckel3
 | `/api/crops` | API-nyckel | Läs grödor |
 | `/api/calculate-need` | API-nyckel | Beräkna näringsbehov |
 | `/api/admin/*` | Admin-lösenord | Databashantering |
+| `/api/webhook/m3-product` | Webhook-secret | M3 ERP-integration |
 | `/api/optimize-v*` | Blockerad externt | Interna optimerare |
 
 ### API-nyckel (extern åtkomst)
@@ -76,6 +80,17 @@ curl -H "X-API-Key: din-nyckel" http://localhost:3000/api/products
 ```bash
 curl -H "X-Admin-Password: ditt-lösenord" http://localhost:3000/api/admin/products
 ```
+
+### M3 Webhook (ERP-integration)
+
+```bash
+curl -X POST http://localhost:3000/api/webhook/m3-product \
+  -H "X-Webhook-Secret: din-hemliga-nyckel" \
+  -H "Content-Type: application/json" \
+  -d '{"itemNumber": "301763", "salesPrice": 5500, "active": true}'
+```
+
+Se `docs/M3_WEBHOOK_INTEGRATION.md` för fullständig dokumentation.
 
 ### Swagger UI
 

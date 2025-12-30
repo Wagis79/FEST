@@ -2,6 +2,36 @@
 
 Alla viktiga ändringar i projektet dokumenteras här.
 
+## [2.6.0] - 2025-12-30
+
+### 🔗 M3 CE ERP-integration
+
+#### Ny funktionalitet
+- **M3 Webhook** - Endpoint för att ta emot produktuppdateringar från M3 CE ERP-system
+  - `POST /api/webhook/m3-product` - Uppdatera pris och/eller active-status
+  - Matchar på artikelnummer
+  - Autentisering via `X-Webhook-Secret` header
+- **Produkters active-status** - Ny `active` boolean-kolumn i databasen
+  - Inaktiva produkter exkluderas automatiskt från rekommendationer
+  - Default: `true` för alla befintliga produkter
+
+#### Admin-gränssnitt
+- **Status-kolumn** i produkttabellen med färgkodade badges
+  - ✅ Grön badge för aktiva produkter
+  - ❌ Röd badge för inaktiva produkter
+- **Inaktiva produkter** visas med dämpad opacitet (60%)
+- **Status-fält** i formulär för lägg till/redigera produkt
+- **Statistik-kort** visar nu aktiva/inaktiva produkter
+
+#### Dokumentation
+- `docs/M3_WEBHOOK_INTEGRATION.md` - Komplett webhook-specifikation för M3-integration
+- Inkluderar curl-exempel, felkoder och säkerhetsinformation
+
+#### Nya miljövariabler
+- `M3_WEBHOOK_SECRET` - Hemlig nyckel för webhook-autentisering
+
+---
+
 ## [2.5.0] - 2025-12-30
 
 ### 🔐 API-säkerhet och extern åtkomst
