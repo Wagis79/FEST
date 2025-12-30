@@ -100,6 +100,7 @@ const Admin = {
             <tr>
               <th class="sortable" onclick="Admin.sortBy('Artikelnr')">Artikelnr</th>
               <th class="sortable" onclick="Admin.sortBy('Produkt')">Produkt</th>
+              <th class="sortable" onclick="Admin.sortBy('active')">Status</th>
               <th class="sortable" onclick="Admin.sortBy('N')">N</th>
               <th class="sortable" onclick="Admin.sortBy('P')">P</th>
               <th class="sortable" onclick="Admin.sortBy('K')">K</th>
@@ -128,10 +129,16 @@ const Admin = {
   },
 
   renderRow(product) {
+    const isActive = product.active !== false;
+    const statusBadge = isActive 
+      ? '<span class="status-badge status-active">✅ Aktiv</span>'
+      : '<span class="status-badge status-inactive">❌ Inaktiv</span>';
+    
     return `
-      <tr>
+      <tr${!isActive ? ' style="opacity: 0.6;"' : ''}>
         <td>${product.Artikelnr || '-'}</td>
         <td><strong>${product.Produkt || '-'}</strong></td>
+        <td>${statusBadge}</td>
         <td>${product.N || '-'}</td>
         <td>${product.P || '-'}</td>
         <td>${product.K || '-'}</td>
@@ -156,10 +163,21 @@ const Admin = {
   },
 
   updateStats() {
+    const activeCount = this.products.filter(p => p.active !== false).length;
+    const inactiveCount = this.products.length - activeCount;
+    
     const statsHTML = `
       <div class="stat-card">
         <div class="stat-number">${this.products.length}</div>
         <div class="stat-label">Totalt produkter</div>
+      </div>
+      <div class="stat-card" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%);">
+        <div class="stat-number">${activeCount}</div>
+        <div class="stat-label">Aktiva produkter</div>
+      </div>
+      <div class="stat-card" style="background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);">
+        <div class="stat-number">${inactiveCount}</div>
+        <div class="stat-label">Inaktiva produkter</div>
       </div>
     `;
     
@@ -238,6 +256,7 @@ const Admin = {
     document.getElementById('product-form').reset();
     document.getElementById('optimeringsbar').value = 'Ja';
     document.getElementById('enhet').value = 'KG';
+    document.getElementById('active').value = 'true';
     document.getElementById('product-modal').classList.add('active');
   },
 
@@ -250,6 +269,7 @@ const Admin = {
     
     document.getElementById('artikelnr').value = product.Artikelnr || '';
     document.getElementById('produkt').value = product.Produkt || '';
+    document.getElementById('active').value = product.active !== false ? 'true' : 'false';
     document.getElementById('n').value = product.N || '';
     document.getElementById('p').value = product.P || '';
     document.getElementById('k').value = product.K || '';
@@ -285,6 +305,7 @@ const Admin = {
     const productData = {
       Artikelnr: parseInt(document.getElementById('artikelnr').value),
       Produkt: document.getElementById('produkt').value,
+      active: document.getElementById('active').value === 'true',
       N: document.getElementById('n').value || '-',
       P: document.getElementById('p').value || '-',
       K: document.getElementById('k').value || '-',
