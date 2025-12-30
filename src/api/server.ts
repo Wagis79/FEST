@@ -70,6 +70,7 @@ function requireAdminPassword(req: Request, res: Response, next: NextFunction) {
  * API Key middleware for external API access
  * Checks X-API-Key header against configured keys
  * If no keys are configured, access is open (for development)
+ * Same-origin requests (from our frontend) are allowed without API key
  */
 function requireApiKey(req: Request, res: Response, next: NextFunction) {
   // If no API keys configured, allow access (development mode)
@@ -77,8 +78,34 @@ function requireApiKey(req: Request, res: Response, next: NextFunction) {
     return next();
   }
 
+  // Check if request is from same origin (our frontend)
+  // Same-origin requests typically have Referer header matching our host
+  // or come from browser without X-API-Key header and with typical browser headers
+  const referer = req.headers['referer'] as string;
+  const origin = req.headers['origin'] as string;
+  const host = req.headers['host'] as string;
+  
+  // If Referer or Origin matches our host, it's a same-origin request - allow it
+  if (referer && host && referer.includes(host)) {
+    return next();
+  }
+  if (origin && host && origin.includes(host)) {
+    return next();
+  }
+  
+  // For requests without Referer/Origin but also without API key,
+  // check if it looks like a browser request (Accept header includes text/html)
+  // This handles initial page loads and navigation
+  const accept = req.headers['accept'] as string;
   const apiKey = req.headers['x-api-key'] as string;
+  
+  // If no API key provided and request accepts HTML, it might be browser navigation
+  // But for API calls (Accept: application/json), we need authentication
+  if (!apiKey && accept && accept.includes('text/html')) {
+    return next();
+  }
 
+  // External API request - require API key
   if (!apiKey) {
     return res.status(401).json({
       success: false,
