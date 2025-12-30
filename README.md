@@ -82,6 +82,12 @@ curl -H "X-Admin-Password: ditt-lösenord" http://localhost:3000/api/admin/produ
 - **Extern dokumentation:** `/api-docs`
 - **Intern dokumentation:** `/api-docs-internal`
 
+### Produktion (Railway)
+
+```
+https://fest-production-d1bb.up.railway.app
+```
+
 ---
 
 ## Arkitektur

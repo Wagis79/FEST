@@ -23,8 +23,10 @@ info:
     name: Proprietary
 
 servers:
-  - url: https://your-production-server.com
-    description: Produktionsserver
+  - url: https://fest-production-d1bb.up.railway.app
+    description: Produktionsserver (Railway)
+  - url: http://localhost:3000
+    description: Lokal utveckling
 
 tags:
   - name: Optimering

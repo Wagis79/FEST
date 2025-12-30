@@ -4,7 +4,9 @@
 
 FEST API:et tillhandahåller gödseloptimering baserad på näringsbehov. API:et använder MILP-optimering (Mixed Integer Linear Programming) för att hitta den mest kostnadseffektiva produktkombinationen.
 
-**Base URL:** `https://your-production-server.com`
+**Produktion:** `https://fest-production-d1bb.up.railway.app`
+
+**Swagger UI:** `https://fest-production-d1bb.up.railway.app/api-docs`
 
 ---
 

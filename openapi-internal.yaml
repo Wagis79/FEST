@@ -23,6 +23,8 @@ info:
     name: FEST Development Team
 
 servers:
+  - url: https://fest-production-d1bb.up.railway.app
+    description: Produktionsserver (Railway)
   - url: http://localhost:3000
     description: Lokal utvecklingsserver
 

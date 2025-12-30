@@ -1,7 +1,8 @@
 # FEST API Documentation
 
 **Version:** 1.0  
-**Base URL:** `http://your-server:3000`  
+**Produktion:** `https://fest-production-d1bb.up.railway.app`  
+**Lokal utveckling:** `http://localhost:3000`  
 **Content-Type:** `application/json`
 
 ---
