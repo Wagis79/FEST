@@ -7,6 +7,10 @@ const Forms = {
     // Flagga för att förhindra dubbelklick
     isCalculating: false,
     
+    // Debounced versioner av beräkningsfunktioner (skapas i init)
+    debouncedCalculateNutrientNeed: null,
+    debouncedCalculateAdvancedNutrientNeed: null,
+    
     /**
      * Beräkna näringsbehov från gröda (Enkel flik)
      */
@@ -14,7 +18,12 @@ const Forms = {
         const cropId = document.getElementById('crop').value;
         const yieldValue = parseFloat(document.getElementById('yield').value);
 
+        // Om gröda eller skörd saknas, töm näringsbehovsfälten
         if (!cropId || !yieldValue || yieldValue <= 0) {
+            document.getElementById('nitrogen').value = '';
+            document.getElementById('phosphorus').value = '';
+            document.getElementById('potassium').value = '';
+            document.getElementById('sulfur').value = '';
             return;
         }
 
@@ -41,7 +50,12 @@ const Forms = {
         const cropId = document.getElementById('advCrop').value;
         const yieldValue = parseFloat(document.getElementById('advYield').value);
 
+        // Om gröda eller skörd saknas, töm näringsbehovsfälten
         if (!cropId || !yieldValue || yieldValue <= 0) {
+            document.getElementById('advNitrogen').value = '';
+            document.getElementById('advPhosphorus').value = '';
+            document.getElementById('advPotassium').value = '';
+            document.getElementById('advSulfur').value = '';
             return;
         }
 
@@ -515,6 +529,10 @@ const Forms = {
      * Initiera formulärhantering
      */
     init() {
+        // Skapa debounced versioner av beräkningsfunktioner (väntar 400ms efter sista tangenttryckning)
+        this.debouncedCalculateNutrientNeed = Utils.debounce(() => this.calculateNutrientNeed(), 400);
+        this.debouncedCalculateAdvancedNutrientNeed = Utils.debounce(() => this.calculateAdvancedNutrientNeed(), 400);
+
         // Event listeners för formulär
         const basicForm = document.getElementById('nutrientForm');
         const advancedForm = document.getElementById('advancedForm');
@@ -533,10 +551,14 @@ const Forms = {
         const advCrop = document.getElementById('advCrop');
         const advYield = document.getElementById('advYield');
 
+        // Gröda-val triggar omedelbart (dropdown)
         if (crop) crop.addEventListener('change', () => this.calculateNutrientNeed());
-        if (yieldInput) yieldInput.addEventListener('input', () => this.calculateNutrientNeed());
+        // Yield-input använder debounce för att vänta tills användaren slutat skriva
+        if (yieldInput) yieldInput.addEventListener('input', () => this.debouncedCalculateNutrientNeed());
+        
+        // Samma för avancerad flik
         if (advCrop) advCrop.addEventListener('change', () => this.calculateAdvancedNutrientNeed());
-        if (advYield) advYield.addEventListener('input', () => this.calculateAdvancedNutrientNeed());
+        if (advYield) advYield.addEventListener('input', () => this.debouncedCalculateAdvancedNutrientNeed());
 
         console.log('✅ Formulärhantering initierad');
     }

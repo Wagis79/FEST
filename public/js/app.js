@@ -51,6 +51,18 @@
         // Registrera event listeners för förfrukt först när crops är laddade
         const previousCrop = document.getElementById('previousCrop');
         const previousYield = document.getElementById('previousYield');
+        
+        // Debounced version för yield-input (väntar tills användaren slutat skriva)
+        const debouncedPreviousYieldCalc = Utils.debounce(() => {
+            try {
+                if (window.Balance && window.Balance.calculateFromPreviousCrop) {
+                    window.Balance.calculateFromPreviousCrop(false);
+                }
+            } catch (err) {
+                console.error('❌ Fel vid automatisk förfruktsberäkning (previousYield):', err);
+            }
+        }, 400);
+        
         if (previousCrop) previousCrop.addEventListener('change', () => {
             const val = previousCrop.value;
             try {
@@ -62,17 +74,7 @@
                 console.error('❌ Fel vid automatisk förfruktsberäkning (previousCrop):', err);
             }
         });
-        if (previousYield) previousYield.addEventListener('input', () => {
-            const val = previousYield.value;
-            try {
-                if (window.Balance && window.Balance.calculateFromPreviousCrop) {
-                    // Auto-beräkning utan felmeddelande (showError = false)
-                    window.Balance.calculateFromPreviousCrop(false);
-                }
-            } catch (err) {
-                console.error('❌ Fel vid automatisk förfruktsberäkning (previousYield):', err);
-            }
-        });
+        if (previousYield) previousYield.addEventListener('input', debouncedPreviousYieldCalc);
         PurchaseList.render();
 
         console.log('✅ FEST redo att användas!');

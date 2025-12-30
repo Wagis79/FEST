@@ -5,6 +5,24 @@
 
 const Utils = {
     /**
+     * Debounce - vänta tills användaren slutat skriva innan funktionen körs
+     * @param {Function} func - Funktionen som ska köras
+     * @param {number} wait - Millisekunder att vänta (default 400ms)
+     * @returns {Function} - Debounced funktion
+     */
+    debounce(func, wait = 400) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    },
+
+    /**
      * Formatera nummer med tusentalsavskiljare
      */
     formatNumber(num) {
