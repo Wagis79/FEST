@@ -1,7 +1,7 @@
 -- ============================================================================
 -- FEST Algorithm Configuration Table
 -- Skapad: 2024-12-27
--- Beskrivning: Lagrar konfigurerbara parametrar för optimeringsalgoritmen (V5)
+-- Beskrivning: Lagrar konfigurerbara parametrar för optimeringsalgoritmen (V7)
 -- ============================================================================
 
 -- Skapa tabellen för algoritmkonfiguration
@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS algorithm_config (
 );
 
 -- Kommentar på tabellen
-COMMENT ON TABLE algorithm_config IS 'Konfigurerbara parametrar för FEST optimeringsalgoritm V5';
+COMMENT ON TABLE algorithm_config IS 'Konfigurerbara parametrar för FEST optimeringsalgoritm V7';
 
 -- Kommentarer på kolumner
 COMMENT ON COLUMN algorithm_config.key IS 'Unik nyckel för parametern';
