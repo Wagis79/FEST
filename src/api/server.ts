@@ -7,7 +7,6 @@ import swaggerUi from 'swagger-ui-express';
 import YAML from 'yaml';
 import { calculateNutrientNeed, calculateNutrientNeedWithPrecrop, Crop } from '../data/crops';
 import { recommend, RecommendOptions } from '../engine/recommend';
-import { optimizeV5, OptimizeV5Input, OptimizeV5Output } from '../engine/optimize-v5';
 import { optimizeV7, OptimizeV7Input, OptimizeV7Output } from '../engine/optimize-v7';
 import { NutrientNeed } from '../models/NutrientNeed';
 import { Strategy } from '../engine/scoring';
@@ -338,116 +337,6 @@ app.post('/api/recommend', requireApiKey, async (req: Request, res: Response) =>
     res.status(500).json({
       success: false,
       error: 'Serverfel vid beräkning av rekommendationer',
-    });
-  }
-});
-
-/**
- * POST /api/optimize-v5
- * MILP-baserad ILP-optimering (global optimum)
- * 
- * Body: {
- *   targets: { N: number, P?: number, K?: number, S?: number },
- *   mustFlags: { mustP?: boolean, mustK?: boolean, mustS?: boolean },
- *   maxProducts?: number (1-5, default 2),
- *   minDose?: number (default 100),
- *   maxDose?: number (default 600)
- * }
- * 
- * Returnerar prispall med upp till 3 strategier (billigaste produktmixar)
- */
-app.post('/api/optimize-v5', blockExternalAccess, async (req: Request, res: Response) => {
-  try {
-    const { 
-      targets, 
-      mustFlags = {}, 
-      maxProducts = 2, 
-      minDose = 100, 
-      maxDose = 600 
-    } = req.body;
-
-    console.log('📥 /api/optimize-v5 request:', { 
-      targets, 
-      mustFlags, 
-      maxProducts,
-      minDose,
-      maxDose 
-    });
-
-    // Validera targets
-    if (!targets || typeof targets !== 'object') {
-      return res.status(400).json({
-        success: false,
-        error: 'targets krävs och måste vara ett objekt med N, P, K, S',
-      });
-    }
-
-    // N måste finnas
-    if (!targets.N || targets.N <= 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'Kvävebehov (targets.N) måste vara > 0',
-      });
-    }
-
-    // Validera maxProducts
-    const maxProd = Math.min(5, Math.max(1, parseInt(maxProducts) || 2));
-
-    // Hämta alla produkter
-    const products = await getAllProductsForRecommendation();
-    
-    if (products.length === 0) {
-      return res.status(500).json({
-        success: false,
-        error: 'Inga produkter tillgängliga för optimering',
-      });
-    }
-
-    console.log(`🔧 V5-optimering med ${products.length} produkter`);
-
-    // Kör V5-optimering
-    const input: OptimizeV5Input = {
-      targets: {
-        N: targets.N || 0,
-        P: targets.P || 0,
-        K: targets.K || 0,
-        S: targets.S || 0,
-      },
-      mustFlags: {
-        mustP: mustFlags.mustP || false,
-        mustK: mustFlags.mustK || false,
-        mustS: mustFlags.mustS || false,
-      },
-      maxProductsUser: maxProd,
-      minDoseKgHa: minDose,
-      maxDoseKgHa: maxDose,
-    };
-
-    // Hämta algoritmkonfiguration från databasen
-    try {
-      const algorithmConfig = await getAlgorithmConfigMap();
-      input.config = algorithmConfig;
-      console.log('⚙️  Algoritmkonfiguration laddad för /optimize-v5');
-    } catch (configErr) {
-      console.warn('⚠️  Kunde inte ladda algoritmkonfiguration, använder defaults:', configErr);
-      // Fortsätt med defaults om config inte kan laddas
-    }
-
-    const result = optimizeV5(products, input);
-
-    console.log(`✅ V5 returnerade: ${result.strategies.length} strategier, status: ${result.status}`);
-
-    res.json({
-      success: result.status === 'ok',
-      ...result,
-    });
-  } catch (error) {
-    console.error('Error in /api/optimize-v5:', error);
-    res.status(500).json({
-      success: false,
-      status: 'error',
-      error: 'Serverfel vid V5-optimering',
-      message: error instanceof Error ? error.message : 'Okänt fel',
     });
   }
 });

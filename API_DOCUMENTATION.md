@@ -43,7 +43,6 @@ curl -X POST "https://your-server.com/api/recommend" \
 | `/api/products` | GET | ✅ Extern | Hämta produkter |
 | `/api/crops` | GET | ✅ Extern | Hämta grödor |
 | `/api/calculate-need` | POST | ✅ Extern | Beräkna näringsbehov |
-| `/api/optimize-v5` | POST | ❌ Intern | Blockerad för externa anrop |
 | `/api/optimize-v7` | POST | ❌ Intern | Blockerad för externa anrop |
 | `/api/admin/*` | * | ❌ Admin | Kräver admin-lösenord |
 

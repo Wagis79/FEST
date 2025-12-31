@@ -14,9 +14,8 @@ Systemet består av en Express/TypeScript backend med MILP-optimering och en mod
 
 ### Optimeringsmotorer (`src/engine/`)
 - **optimize-v7.ts** - ⭐ Produktionsmotor (HiGHS MILP/ILP)
-- **optimize-v6.ts** - Legacy: HiGHS-baserad
-- **optimize-v5.ts** - Legacy: javascript-lp-solver
-- **optimize-v4.ts** - Legacy: kombinatorisk grid-search
+- **highs-pool.ts** - Worker pool för HiGHS
+- **highs-worker.ts** - Worker thread för HiGHS
 - **recommend.ts** - API-adapter som anropar V7
 - **scoring.ts** - Strategy-typer
 
@@ -24,7 +23,6 @@ Systemet består av en Express/TypeScript backend med MILP-optimering och en mod
 - **Product.ts** - Produkt med näringsinnehåll
 - **NutrientNeed.ts** - Näringsbehov (N/P/K/S kg/ha)
 - **Solution.ts** - Lösning med produktallokering
-- **Tolerances.ts** - Tolerans-typer (legacy, V7 använder databas)
 
 ### Data (`src/data/`)
 - **crops.ts** - Gröda-typer och beräkningsfunktioner

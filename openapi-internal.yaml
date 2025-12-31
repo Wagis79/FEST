@@ -16,7 +16,7 @@ info:
     
     - **Öppen**: `/health`
     - **Extern (API-nyckel)**: `/api/recommend`, `/api/products`, `/api/crops`, `/api/calculate-need`
-    - **Intern**: `/api/optimize-v5`, `/api/optimize-v7`
+    - **Intern**: `/api/optimize-v7`
     - **Admin**: `/api/admin/*`
   version: 1.0.0
   contact:
@@ -93,29 +93,6 @@ paths:
   # ============================================================================
   # OPTIMERING - INTERN
   # ============================================================================
-  /api/optimize-v5:
-    post:
-      tags: [Optimering]
-      summary: MILP-optimering V5 (intern)
-      description: |
-        **⚠️ Endast intern användning** - Blockerad för externa API-anrop.
-        
-        Enklare MILP-optimering utan prispall.
-      operationId: optimizeV5
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/OptimizeV5Request'
-      responses:
-        '200':
-          description: Lyckad optimering
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OptimizeV5Response'
-
   /api/optimize-v7:
     post:
       tags: [Optimering]
@@ -451,41 +428,6 @@ components:
           $ref: '#/components/schemas/NutrientNeed'
         costPerHa:
           type: number
-
-    OptimizeV5Request:
-      type: object
-      required: [targets]
-      properties:
-        targets:
-          $ref: '#/components/schemas/NutrientNeed'
-        mustFlags:
-          type: object
-          properties:
-            mustN:
-              type: boolean
-            mustP:
-              type: boolean
-            mustK:
-              type: boolean
-            mustS:
-              type: boolean
-        maxProducts:
-          type: integer
-          default: 2
-
-    OptimizeV5Response:
-      type: object
-      properties:
-        success:
-          type: boolean
-        status:
-          type: string
-        cost:
-          type: number
-        products:
-          type: array
-          items:
-            type: object
 
     OptimizeV7Request:
       type: object

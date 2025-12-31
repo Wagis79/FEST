@@ -165,15 +165,13 @@ src/
 ├── engine/
 │   ├── recommend.ts    # Rekommendations-orchestrator
 │   ├── optimize-v7.ts  # HiGHS MILP (produktion)
-│   ├── optimize-v6.ts  # HiGHS legacy
-│   ├── optimize-v5.ts  # javascript-lp-solver
-│   ├── optimize-v4.ts  # Kombinatorisk sökning
+│   ├── highs-pool.ts   # Worker pool för HiGHS
+│   ├── highs-worker.ts # Worker thread för HiGHS
 │   └── scoring.ts      # Lösningsutvärdering
 ├── models/
 │   ├── Product.ts      # Produkttyper
 │   ├── Solution.ts     # Lösningstyper
-│   ├── NutrientNeed.ts # Näringsbehovstyper
-│   └── Tolerances.ts   # Toleranstyper
+│   └── NutrientNeed.ts # Näringsbehovstyper
 └── data/
     └── crops.ts        # Fallback-gröddata
 

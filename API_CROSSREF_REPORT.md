@@ -33,8 +33,7 @@
 
 | Endpoint | Metod | server.ts (rad) | openapi-internal.yaml | API_DOCUMENTATION.md |
 |----------|-------|-----------------|----------------------|---------------------|
-| `/api/optimize-v5` | POST | 328 (blockExternalAccess) | ✅ | ✅ |
-| `/api/optimize-v7` | POST | 444 (blockExternalAccess) | ✅ | ✅ |
+| `/api/optimize-v7` | POST | 344 (blockExternalAccess) | ✅ | ✅ |
 
 ### Admin endpoints (requireAdminPassword middleware)
 
@@ -106,7 +105,7 @@
 | Swagger URL | Fil | Endpoints inkluderade |
 |-------------|-----|----------------------|
 | `/api-docs` | openapi.yaml | health, recommend, products, crops, calculate-need |
-| `/api-docs-internal` | openapi-internal.yaml | Alla ovan + optimize-v5, optimize-v7, admin/* |
+| `/api-docs-internal` | openapi-internal.yaml | Alla ovan + optimize-v7, admin/* |
 
 ---
 

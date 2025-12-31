@@ -1,8 +1,7 @@
 /**
  * Toleranser för över- och undergödsling per näringsämne
  * 
- * OBS: Dessa typer behålls för bakåtkompatibilitet med optimize-v4.
- * Produktionsmotorn (V7) använder istället konfiguration från databas 
+ * Produktionsmotorn (V7) använder konfiguration från databas 
  * (algorithm_config-tabellen) via AlgorithmConfigV7.
  */
 export interface ToleranceSettings {
