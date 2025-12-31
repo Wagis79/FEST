@@ -1,3 +1,9 @@
+/**
+ * FEST - Fertilizer Decision Support System
+ * Copyright (c) 2025 Johan Wågstam <wagis79@gmail.com>
+ * All rights reserved.
+ */
+
 /*
   Smoke test for admin security without opening a TCP port.
   This avoids terminal/tooling limitations where background servers get interrupted.

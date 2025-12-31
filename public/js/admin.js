@@ -1,4 +1,8 @@
 /**
+ * FEST - Fertilizer Decision Support System
+ * Copyright (c) 2025 Johan Wågstam <wagis79@gmail.com>
+ * All rights reserved.
+ * 
  * Admin Panel JavaScript - Enhanced UI/UX
  * Features: Search, Sort, Add/Edit Modal
  * Security: Requires password from session

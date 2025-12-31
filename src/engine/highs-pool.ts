@@ -1,4 +1,10 @@
 /**
+ * FEST - Fertilizer Decision Support System
+ * Copyright (c) 2025 Johan Wågstam <wagis79@gmail.com>
+ * All rights reserved.
+ */
+
+/**
  * HiGHS Worker Pool
  * 
  * Hanterar en pool av HiGHS worker-processer för crash isolation.

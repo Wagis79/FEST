@@ -1,5 +1,9 @@
 /**
- * FEST - Main Application Entry Point
+ * FEST - Fertilizer Decision Support System
+ * Copyright (c) 2025 Johan Wågstam <wagis79@gmail.com>
+ * All rights reserved.
+ * 
+ * Main Application Entry Point
  * Initiering av applikationen
  */
 

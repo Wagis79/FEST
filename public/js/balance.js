@@ -1,5 +1,9 @@
 /**
- * FEST - Balance Module
+ * FEST - Fertilizer Decision Support System
+ * Copyright (c) 2025 Johan Wågstam <wagis79@gmail.com>
+ * All rights reserved.
+ * 
+ * Balance Module
  * Hantering av växtnäringsbalans (förfrukt och direkt inmatning)
  */
 

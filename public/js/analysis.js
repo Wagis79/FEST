@@ -1,5 +1,9 @@
 /**
- * FEST Product Analysis
+ * FEST - Fertilizer Decision Support System
+ * Copyright (c) 2025 Johan Wågstam <wagis79@gmail.com>
+ * All rights reserved.
+ * 
+ * Product Analysis
  * Analyzes product pricing and nutrient costs
  */
 

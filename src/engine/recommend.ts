@@ -1,3 +1,9 @@
+/**
+ * FEST - Fertilizer Decision Support System
+ * Copyright (c) 2025 Johan Wågstam <wagis79@gmail.com>
+ * All rights reserved.
+ */
+
 import { Product } from '../models/Product';
 import { NutrientNeed } from '../models/NutrientNeed';
 import { Solution } from '../models/Solution';

@@ -1,4 +1,8 @@
 /**
+ * FEST - Fertilizer Decision Support System
+ * Copyright (c) 2025 Johan Wågstam <wagis79@gmail.com>
+ * All rights reserved.
+ * 
  * Crops Admin Panel JavaScript
  * Features: Search, Sort, Add/Edit/Delete crops
  * Security: Requires password from session
