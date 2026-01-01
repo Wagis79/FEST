@@ -2,6 +2,45 @@
 
 Alla viktiga ändringar i projektet dokumenteras här.
 
+## [2.7.1] - 2026-01-01
+
+### 🧪 Automatiserat testramverk
+
+#### Ny funktionalitet
+- **Vitest testramverk** - Komplett testsvit för kvalitetssäkring
+  - 31 tester totalt (12 motor + 19 API)
+  - Täckningsrapportering med v8 coverage
+
+#### Teststruktur
+- `src/__tests__/engine/optimize-v7.test.ts` - MILP-motor tester
+  - Multi-näringslösning (N, P, K, S)
+  - Enskilda näringsämnen
+  - N-toleranseskalering
+  - PKS-krav och constraints
+  - Kantfall (tomt behov, negativa värden)
+  
+- `src/__tests__/api/server.test.ts` - API integrationstester
+  - Hälsokontroll (/health)
+  - Gröddata (/api/crops)
+  - Rekommendationer (/api/recommend)
+  - Behovsberäkning (/api/calculate-need)
+  - API-nyckel autentisering
+
+#### Nya scripts
+```bash
+npm test              # Kör alla tester
+npm run test:watch    # Tester i watch-läge
+npm run test:coverage # Täckningsrapport
+```
+
+#### Nya devDependencies
+- `vitest` ^4.0.16
+- `@vitest/coverage-v8` ^4.0.16
+- `supertest` ^7.1.4
+- `@types/supertest` ^6.0.3
+
+---
+
 ## [2.7.0] - 2026-01-01
 
 ### 🔒 Tvingade produkter (Required Products)

@@ -436,16 +436,50 @@ Administreras via `/admin-config.html` eller direkt i Supabase.
 npm run server    # Starta utvecklingsserver med tsx
 npm run build     # Kompilera TypeScript till dist/
 npm run check     # Typkontroll utan kompilering
+npm test          # Kör alla tester
+npm run test:watch    # Kör tester i watch-läge
+npm run test:coverage # Kör tester med täckningsrapport
 ```
+
+### Testramverk
+
+Projektet använder **Vitest** för enhetstester och integrationstester.
+
+```bash
+# Kör alla tester
+npm test
+
+# Kör tester i watch-läge under utveckling
+npm run test:watch
+
+# Generera täckningsrapport
+npm run test:coverage
+```
+
+#### Teststruktur
+
+```
+src/__tests__/
+├── engine/
+│   └── optimize-v7.test.ts   # MILP-motor tester (12 tester)
+└── api/
+    └── server.test.ts        # API integrationstester (19 tester)
+```
+
+#### Vad testas
+
+- **Optimeringsmotor (V7):** Multi-näringslösning, enskilda näringsämnen, N-toleranseskalering, PKS-krav, kantfall
+- **API-endpoints:** Validering, autentisering, /health, /api/crops, /api/recommend, /api/calculate-need
 
 ### Teknisk stack
 
 - **Runtime:** Node.js
 - **Språk:** TypeScript
-- **Server:** Express
+- **Server:** Express 5.x
 - **Optimering:** HiGHS (via highs-js)
 - **Databas:** Supabase PostgreSQL
 - **Frontend:** Vanilla JavaScript
+- **Testramverk:** Vitest + Supertest
 
 ### Lägga till ny motor
 
