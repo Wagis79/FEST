@@ -67,14 +67,16 @@ const API = {
      */
     async getRecommendations(need, strategy, maxProducts, topN, requiredNutrients) {
         try {
-            // Inkludera exkluderade produkter om det finns några
+            // Inkludera exkluderade och tvingade produkter om det finns några
             const excludedProductIds = AppState.excludedProductIds || [];
+            const requiredProductIds = AppState.requiredProductIds || [];
             
             console.log('[API] ============================================');
             console.log('[API] getRecommendations() anropad');
             console.log('[API] AppState.excludedProductIds:', AppState.excludedProductIds);
-            console.log('[API] excludedProductIds (kopierad):', excludedProductIds);
+            console.log('[API] AppState.requiredProductIds:', AppState.requiredProductIds);
             console.log('[API] Antal exkluderade:', excludedProductIds.length);
+            console.log('[API] Antal tvingade:', requiredProductIds.length);
             
             const requestBody = { 
                 need, 
@@ -82,7 +84,8 @@ const API = {
                 maxProducts, 
                 topN, 
                 requiredNutrients,
-                excludedProductIds: excludedProductIds.length > 0 ? excludedProductIds : undefined
+                excludedProductIds: excludedProductIds.length > 0 ? excludedProductIds : undefined,
+                requiredProductIds: requiredProductIds.length > 0 ? requiredProductIds : undefined
             };
             
             console.log('[API] Request body:', JSON.stringify(requestBody, null, 2));

@@ -81,6 +81,9 @@ Huvudendpoint för optimering. Skicka in näringsbehov och få tillbaka kostnads
 | `topN` | integer | Nej | Antal lösningar att returnera (1-50). Default: 10 |
 | `strategy` | string | Nej | `economic` eller `optimized`. Default: `economic` |
 | `excludedProductIds` | array | Nej | Produkt-ID:n att exkludera |
+| `requiredProductIds` | array | Nej | Produkt-ID:n som MÅSTE inkluderas i lösningen |
+
+> **Obs:** `requiredProductIds` och `excludedProductIds` får inte överlappa. Antal tvingade produkter får inte överstiga `maxProducts`.
 
 ### Exempel
 

@@ -1718,8 +1718,67 @@
             color: #999;
         }
 
-        .product-row-excluded .product-checkbox-cell {
+        .product-row-excluded .product-checkbox-cell,
+        .product-row-excluded .product-status-cell {
             text-decoration: none;
+        }
+
+        /* Tvingade produkter */
+        .product-row-required {
+            background: #e8f5e9 !important;
+        }
+
+        .product-row-required td {
+            color: #1b5e20;
+            font-weight: 500;
+        }
+
+        .product-row-required .product-status-cell {
+            font-weight: normal;
+        }
+
+        /* Status-knappar i produktlistan */
+        .product-status-cell {
+            text-align: center;
+            width: 110px;
+            padding: 4px !important;
+        }
+
+        .status-btn {
+            border: none;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-width: 90px;
+        }
+
+        .status-btn.status-normal {
+            background: #f0f0f0;
+            color: #666;
+        }
+
+        .status-btn.status-normal:hover {
+            background: #e0e0e0;
+        }
+
+        .status-btn.status-required {
+            background: #28a745;
+            color: white;
+        }
+
+        .status-btn.status-required:hover {
+            background: #1e7e34;
+        }
+
+        .status-btn.status-excluded {
+            background: #dc3545;
+            color: white;
+        }
+
+        .status-btn.status-excluded:hover {
+            background: #bd2130;
         }
 
         /* Reset-knapp i modal footer */
@@ -2320,7 +2379,7 @@
                 <table class="product-table">
                     <thead>
                         <tr>
-                            <th class="product-checkbox-cell" title="Inkludera i beräkning">✓</th>
+                            <th class="product-status-cell" title="Status: Normal / Tvingad / Exkluderad">Status</th>
                             <th>Artikel</th>
                             <th>Produktnamn</th>
                             <th>N (%)</th>

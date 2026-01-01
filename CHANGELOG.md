@@ -2,6 +2,47 @@
 
 Alla viktiga ändringar i projektet dokumenteras här.
 
+## [2.7.0] - 2026-01-01
+
+### 🔒 Tvingade produkter (Required Products)
+
+#### Ny funktionalitet
+- **`requiredProductIds`** - Ny parameter i `/api/recommend` för att tvinga in specifika produkter i lösningen
+  - Produkter som anges MÅSTE inkluderas i alla lösningar
+  - Optimeraren hittar bästa kompletterande produkter för att täcka resterande behov
+  - Användbart för:
+    - Befintligt lager som måste användas
+    - Leverantörsavtal med specifika produkter
+    - Kundpreferenser för vissa gödselsorter
+
+#### Valideringsregler
+- `requiredProductIds` och `excludedProductIds` får inte överlappa (400-fel)
+- Antal tvingade produkter får inte överstiga `maxProducts` (400-fel)
+- Varning loggas om tvingad produkt inte finns bland tillgängliga produkter
+
+#### Teknisk implementation
+- LP-constraint `y[i] = 1` läggs till för tvingade produkter i MILP-modellen
+- Constraint propageras genom alla strategier (prispall)
+
+#### Dokumentation
+- Uppdaterad `openapi.yaml` och `openapi-internal.yaml`
+- Uppdaterad `docs/API_DOCUMENTATION.md`
+- Uppdaterad `docs/API_EXTERNAL.md`
+
+#### Exempel
+```bash
+curl -X POST "http://localhost:3000/api/recommend" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "need": {"N": 150, "P": 25, "K": 40, "S": 15},
+    "requiredNutrients": ["N", "P", "K", "S"],
+    "maxProducts": 3,
+    "requiredProductIds": ["prod-301234"]
+  }'
+```
+
+---
+
 ## [2.6.0] - 2025-12-30
 
 ### 🔗 M3 CE ERP-integration

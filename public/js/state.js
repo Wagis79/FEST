@@ -14,8 +14,10 @@ const AppState = {
     purchaseListItems: [],
     pendingSolution: null,
     nutrientBalance: null,
-    // Lokalt exkluderade produkter (session-baserat, sparas i localStorage)
-    excludedProductIds: []
+    // Lokalt exkluderade produkter (session-baserat, sparas i sessionStorage)
+    excludedProductIds: [],
+    // Tvingade produkter som MÅSTE inkluderas i lösningen (session-baserat)
+    requiredProductIds: []
 };
 
 // Exportera för användning i andra moduler

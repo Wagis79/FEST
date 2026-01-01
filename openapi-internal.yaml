@@ -397,6 +397,12 @@ components:
           type: array
           items:
             type: string
+          description: Produkt-IDs att exkludera från optimering
+        requiredProductIds:
+          type: array
+          items:
+            type: string
+          description: Produkt-IDs som MÅSTE inkluderas i lösningen
 
     RecommendResponse:
       type: object

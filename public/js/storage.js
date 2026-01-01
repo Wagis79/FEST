@@ -10,6 +10,7 @@
 const Storage = {
     PURCHASE_LIST_KEY: 'fest_purchaseList',
     EXCLUDED_PRODUCTS_KEY: 'fest_excludedProducts',
+    REQUIRED_PRODUCTS_KEY: 'fest_requiredProducts',
 
     /**
      * Ladda inköpslista från localStorage
@@ -89,7 +90,61 @@ const Storage = {
         AppState.excludedProductIds = [];
         sessionStorage.removeItem(this.EXCLUDED_PRODUCTS_KEY);
         console.log('🗑️ Exkluderade produkter återställda');
+    },
+
+    // =========================================================================
+    // REQUIRED PRODUCTS (Tvingade produkter som MÅSTE inkluderas)
+    // =========================================================================
+
+    /**
+     * Ladda tvingade produkter från sessionStorage
+     */
+    loadRequiredProducts() {
+        try {
+            const stored = sessionStorage.getItem(this.REQUIRED_PRODUCTS_KEY);
+            if (stored) {
+                AppState.requiredProductIds = JSON.parse(stored);
+                console.log('✅ Tvingade produkter laddade:', AppState.requiredProductIds.length, 'produkter');
+                return true;
+            }
+            AppState.requiredProductIds = [];
+            return false;
+        } catch (error) {
+            console.error('❌ Kunde inte ladda tvingade produkter:', error);
+            AppState.requiredProductIds = [];
+            return false;
+        }
+    },
+
+    /**
+     * Spara tvingade produkter till sessionStorage
+     */
+    saveRequiredProducts() {
+        try {
+            sessionStorage.setItem(this.REQUIRED_PRODUCTS_KEY, JSON.stringify(AppState.requiredProductIds));
+            console.log('💾 Tvingade produkter sparade:', AppState.requiredProductIds.length, 'produkter');
+            return true;
+        } catch (error) {
+            console.error('❌ Kunde inte spara tvingade produkter:', error);
+            return false;
+        }
+    },
+
+    /**
+     * Rensa tvingade produkter (återställ)
+     */
+    clearRequiredProducts() {
+        AppState.requiredProductIds = [];
+        sessionStorage.removeItem(this.REQUIRED_PRODUCTS_KEY);
+        console.log('🗑️ Tvingade produkter återställda');
+    },
+
+    /**
+     * Rensa alla produktval (exkluderade + tvingade)
+     */
+    clearAllProductSelections() {
+        this.clearExcludedProducts();
+        this.clearRequiredProducts();
+        console.log('🗑️ Alla produktval återställda');
     }
 };
-
-window.Storage = Storage;

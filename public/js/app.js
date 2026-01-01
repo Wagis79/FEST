@@ -40,7 +40,11 @@
         console.log('💾 Laddar exkluderade produkter...');
         Storage.loadExcludedProducts();
         
-        // 5. Uppdatera produktlist-knappen om det finns exkluderade produkter
+        // 5. Ladda tvingade produkter från sessionStorage
+        console.log('💾 Laddar tvingade produkter...');
+        Storage.loadRequiredProducts();
+        
+        // 6. Uppdatera produktlist-knappen om det finns exkluderade/tvingade produkter
         if (typeof updateProductListButton === 'function') {
             updateProductListButton();
         }

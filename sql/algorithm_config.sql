@@ -54,13 +54,15 @@ DELETE FROM algorithm_config WHERE key IN ('USE_V5', 'USE_V6', 'USE_V7');
 -- ============================================================================
 -- TOLERANSER (Constraints)
 -- ============================================================================
+-- OBS: Dessa värden är MASTER för systemet. Koden i optimize-v7.ts har
+-- fallback-defaults som bara används om databasen inte kan nås.
 
 INSERT INTO algorithm_config (key, value, unit, description, min_value, max_value, category)
 VALUES 
     ('N_TOLERANCE_KG', 1, 'kg/ha', 'Max överskott av kväve (N) över target. N måste vara mellan target och target + detta värde.', 0, 5, 'tolerances'),
-    ('PKS_MIN_PCT', 85, '%', 'Minsta accepterade procent av P/K/S target. Om användaren kryssar i P/K/S måste leveransen vara minst detta värde av behovet.', 50, 100, 'tolerances'),
-    ('PKS_MAX_PCT', 125, '%', 'Högsta accepterade procent av P/K/S target. Om användaren kryssar i P/K/S får leveransen inte överstiga detta värde av behovet.', 100, 200, 'tolerances'),
-    ('HIGH_LEVEL_THRESHOLD', 150, '%', 'Varningströskel för ej ikryssade ämnen. Om P/K/S levereras över denna procent (utan att vara ikryssad) visas en varning.', 100, 300, 'tolerances')
+    ('PKS_MIN_PCT', 90, '%', 'Minsta accepterade procent av P/K/S target. Om användaren kryssar i P/K/S måste leveransen vara minst detta värde av behovet.', 50, 100, 'tolerances'),
+    ('PKS_MAX_PCT', 150, '%', 'Högsta accepterade procent av P/K/S target. Om användaren kryssar i P/K/S får leveransen inte överstiga detta värde av behovet.', 100, 200, 'tolerances'),
+    ('HIGH_LEVEL_THRESHOLD', 151, '%', 'Varningströskel för ej ikryssade ämnen. Om P/K/S levereras över denna procent (utan att vara ikryssad) visas en varning.', 100, 300, 'tolerances')
 ON CONFLICT (key) DO UPDATE SET
     value = EXCLUDED.value,
     unit = EXCLUDED.unit,
@@ -76,7 +78,7 @@ ON CONFLICT (key) DO UPDATE SET
 
 INSERT INTO algorithm_config (key, value, unit, description, min_value, max_value, category)
 VALUES 
-    ('DEFAULT_MIN_DOSE', 100, 'kg/ha', 'Standard minsta dos per produkt. Produkter under denna dos exkluderas från lösningen.', 0, 200, 'doses'),
+    ('DEFAULT_MIN_DOSE', 75, 'kg/ha', 'Standard minsta dos per produkt. Produkter under denna dos exkluderas från lösningen.', 0, 200, 'doses'),
     ('DEFAULT_MAX_DOSE', 600, 'kg/ha', 'Standard högsta dos per produkt. Produkter över denna dos begränsas till detta värde.', 300, 1000, 'doses')
 ON CONFLICT (key) DO UPDATE SET
     value = EXCLUDED.value,

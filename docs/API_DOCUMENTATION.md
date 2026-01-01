@@ -137,7 +137,8 @@ Content-Type: application/json
   "maxProducts": 3,
   "topN": 5,
   "strategy": "economic",
-  "excludedProductIds": ["prod-12345"]
+  "excludedProductIds": ["prod-12345"],
+  "requiredProductIds": ["prod-301234"]
 }
 ```
 
@@ -155,6 +156,46 @@ Content-Type: application/json
 | `topN` | number | Nej | Antal lösningar att returnera. Default: 10 |
 | `strategy` | string | Nej | Optimeringsstrategi: `"economic"` (billigast) eller `"optimized"` (precision). Default: `"economic"` |
 | `excludedProductIds` | array | Nej | Lista med produkt-ID:n att exkludera från optimeringen |
+| `requiredProductIds` | array | Nej | Lista med produkt-ID:n som MÅSTE inkluderas i lösningen |
+
+> **Obs:** `requiredProductIds` och `excludedProductIds` får inte överlappa. Antal tvingade produkter får inte överstiga `maxProducts`.
+
+#### Rekommenderade gränsvärden
+
+Baserat på omfattande testning rekommenderas följande gränsvärden för optimal prestanda:
+
+| Parameter | Minimum | Maximum | Rekommenderat | Kommentar |
+|-----------|---------|---------|---------------|-----------|
+| **Totalt näringsbehov** | 20 kg/ha | 600 kg/ha | 50-400 kg/ha | Under 20 kg/ha ger ofta inga lösningar |
+| **N (kväve)** | 10 kg/ha | 400 kg/ha | 50-300 kg/ha | Över 400 kan ge minnesfel |
+| **P (fosfor)** | 5 kg/ha | 100 kg/ha | 10-60 kg/ha | |
+| **K (kalium)** | 5 kg/ha | 150 kg/ha | 20-100 kg/ha | |
+| **S (svavel)** | 5 kg/ha | 60 kg/ha | 10-40 kg/ha | |
+| **maxProducts** | 1 | 5 | 2-4 | |
+| **requiredProductIds** | 0 | maxProducts | maxProducts - 1 | Lämna minst 1 slot för optimeraren |
+| **excludedProductIds** | 0 | ∞ | Max 15 | Många exkluderade begränsar lösningar |
+
+#### Varningar i respons
+
+API:et returnerar automatiskt varningar om parametrarna närmar sig gränserna:
+
+```json
+{
+  "success": true,
+  "count": 3,
+  "warnings": [
+    "Lågt totalt näringsbehov (18 kg/ha). Rekommendation: minst 20 kg/ha.",
+    "Alla produktslots är tvingade (3/3). Optimeraren har ingen flexibilitet."
+  ],
+  "limits": {
+    "maxProducts": { "min": 1, "max": 5, "recommended": 3 },
+    "requiredProductIds": { "max": 3, "recommended": 2 },
+    "totalNeed": { "min": 20, "max": 600, "unit": "kg/ha" },
+    "nitrogen": { "max": 400, "unit": "kg/ha" }
+  },
+  "solutions": [...]
+}
+```
 
 #### Response
 

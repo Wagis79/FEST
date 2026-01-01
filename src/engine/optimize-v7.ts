@@ -62,6 +62,8 @@ export interface OptimizeV7Input {
   maxDoseKgHa: number;             // Default 600
   /** Valfri algoritm-konfiguration */
   config?: AlgorithmConfigV7;
+  /** Produkt-IDs som MÅSTE inkluderas i lösningen */
+  requiredProductIds?: string[];
 }
 
 export interface ProductAllocationV7 {
@@ -95,14 +97,20 @@ export interface AlgorithmConfigV7 {
 
 /**
  * Default-värden för algoritm-konfiguration
+ * 
+ * OBS: Dessa är FALLBACK-värden. Produktionen använder alltid
+ * värden från databasen (algorithm_config tabellen).
+ * Dessa defaults används endast om databasen inte kan nås.
+ * 
+ * Synka med: sql/algorithm_config.sql
  */
 export const DEFAULT_ALGORITHM_CONFIG_V7: Required<AlgorithmConfigV7> = {
   N_TOLERANCE_KG: 1,
   N_MAX_TOLERANCE_KG: 5,
-  PKS_MIN_PCT: 85,
-  PKS_MAX_PCT: 125,
-  HIGH_LEVEL_THRESHOLD: 150,
-  MAX_PRODUCTS_HARD: 4,  // Hård cap per specifikation
+  PKS_MIN_PCT: 90,       // Databas-master: 90
+  PKS_MAX_PCT: 150,      // Databas-master: 150
+  HIGH_LEVEL_THRESHOLD: 151,  // Databas-master: 151
+  MAX_PRODUCTS_HARD: 5,  // Databas-master: 5
   NUM_STRATEGIES: 3,
   TIMEOUT_MS: 30000,
 };
@@ -566,6 +574,7 @@ function solveSingleNutrient(
  * - sum(y_i) <= maxProducts
  * - näringsconstraints för aktiverade ämnen
  * - no-good cuts från tidigare strategier
+ * - y_i = 1 för tvingade produkter
  */
 async function solveMILP(
   highs: any,
@@ -577,7 +586,8 @@ async function solveMILP(
   maxDose: number,
   nToleranceKg: number,
   noGoodCuts: number[][],
-  config: Required<AlgorithmConfigV7>
+  config: Required<AlgorithmConfigV7>,
+  requiredProductIndices: number[] = []
 ): Promise<MILPSolution | null> {
   
   const maxRetries = 3;
@@ -586,8 +596,8 @@ async function solveMILP(
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       return await solveMILPCore(
-  highs, products, targets, mustFlags, maxProducts, minDose, maxDose, 
-        nToleranceKg, noGoodCuts, config
+        highs, products, targets, mustFlags, maxProducts, minDose, maxDose, 
+        nToleranceKg, noGoodCuts, config, requiredProductIndices
       );
     } catch (e: any) {
       lastError = e;
@@ -623,7 +633,8 @@ async function solveMILPCore(
   maxDose: number,
   nToleranceKg: number,
   noGoodCuts: number[][],
-  config: Required<AlgorithmConfigV7>
+  config: Required<AlgorithmConfigV7>,
+  requiredProductIndices: number[] = []
 ): Promise<MILPSolution | null> {
 
   const n = products.length;
@@ -666,6 +677,14 @@ async function solveMILPCore(
   lp += ` c${constraintIdx++}: ` + 
     products.map((_, i) => `y${i}`).join(' + ') + 
     ` <= ${maxProducts}\n`;
+
+  // Tvingade produkter: y_i = 1 för required products
+  // Detta tvingar produkten att inkluderas i lösningen
+  for (const reqIdx of requiredProductIndices) {
+    if (reqIdx >= 0 && reqIdx < n) {
+      lp += ` c${constraintIdx++}: y${reqIdx} = 1\n`;
+    }
+  }
 
   // N-constraint (om mustN=true)
   // N_ach = sum(x_i * n10_i) / 1000  (kg)
@@ -921,6 +940,39 @@ export async function optimizeV7(
     };
   }
   
+  // ──────────────────────────────────────────────────────────────────────────
+  // TVINGADE PRODUKTER - Konvertera ID:n till index
+  // ──────────────────────────────────────────────────────────────────────────
+  const requiredProductIds = input.requiredProductIds || [];
+  const requiredProductIndices: number[] = [];
+  
+  if (requiredProductIds.length > 0) {
+    // Bygg lookup-map för snabb sökning
+    const productIdToIndex = new Map<string, number>();
+    preparedProducts.forEach((p, idx) => productIdToIndex.set(p.id, idx));
+    
+    for (const reqId of requiredProductIds) {
+      const idx = productIdToIndex.get(reqId);
+      if (idx !== undefined) {
+        requiredProductIndices.push(idx);
+      } else {
+        console.warn(`[v7] ⚠️ Tvingad produkt ${reqId} hittades inte bland optimerbara produkter`);
+      }
+    }
+    
+    // Validera att inte för många produkter tvingas
+    if (requiredProductIndices.length > maxProductsUser) {
+      return {
+        status: 'infeasible',
+        usedMaxProducts: maxProductsUser,
+        strategies: [],
+        message: `Antal tvingade produkter (${requiredProductIndices.length}) överstiger maxProducts (${maxProductsUser})`,
+      };
+    }
+    
+    console.log(`[v7] 🔒 Tvingade produkter: ${requiredProductIndices.length} st (${requiredProductIds.join(', ')})`);
+  }
+  
   // Ingen trimning av produktlistan här.
 
   // Räkna aktiva näringsämnen
@@ -1054,7 +1106,8 @@ export async function optimizeV7(
             maxDoseKgHa,
             nTol,
             [],
-            config
+            config,
+            requiredProductIndices
           );
           break; // Lyckades, avbryt retry-loop
         } catch (wasmError: any) {
@@ -1109,7 +1162,8 @@ export async function optimizeV7(
       try {
         return await solveMILP(
           highs, preparedProducts, targets, mustFlags, usedMaxProducts, 
-          minDoseKgHa, maxDoseKgHa, usedNTolerance, noGoods, config
+          minDoseKgHa, maxDoseKgHa, usedNTolerance, noGoods, config,
+          requiredProductIndices
         );
       } catch (e) {
         if (retry === 0) {
@@ -1309,6 +1363,7 @@ export async function optimizeV7ToSolutions(
     minDose?: number;
     maxDose?: number;
     config?: AlgorithmConfigV7;
+    requiredProductIds?: string[];
   } = {}
 ): Promise<import('../models/Solution').Solution[]> {
   
@@ -1326,6 +1381,7 @@ export async function optimizeV7ToSolutions(
     minDoseKgHa: options.minDose || 100,
     maxDoseKgHa: options.maxDose || 600,
     config: options.config,
+    requiredProductIds: options.requiredProductIds,
   };
 
   const result = await optimizeV7(products, input);

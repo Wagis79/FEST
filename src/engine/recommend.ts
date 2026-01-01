@@ -34,6 +34,9 @@ export interface RecommendOptions {
   
   /** Algoritm-konfiguration från databas */
   algorithmConfig?: AlgorithmConfigV7;
+  
+  /** Produkt-IDs som MÅSTE inkluderas i lösningen */
+  requiredProductIds?: string[];
 }
 
 const DEFAULT_OPTIONS = {
@@ -81,6 +84,7 @@ export async function recommend(
     minDose,
     maxDose,
     config: options.algorithmConfig,
+    requiredProductIds: options.requiredProductIds,
   });
   
   console.log(`✅ V7 returnerade: ${solutions.length} lösningar`);

@@ -254,7 +254,7 @@ app.get('/api/products', requireApiKey, async (req: Request, res: Response) => {
  */
 app.post('/api/recommend', requireApiKey, async (req: Request, res: Response) => {
   try {
-  const { need, strategy = 'economic', maxProducts, topN = 10, requiredNutrients, excludedProductIds } = req.body;
+  const { need, strategy = 'economic', maxProducts, topN = 10, requiredNutrients, excludedProductIds, requiredProductIds } = req.body;
 
     console.log('📥 /api/recommend request:', { 
       need, 
@@ -263,7 +263,8 @@ app.post('/api/recommend', requireApiKey, async (req: Request, res: Response) =>
       maxProductsType: typeof maxProducts,
       topN, 
       requiredNutrients,
-      excludedProductIds: excludedProductIds ? excludedProductIds.length : 0
+      excludedProductIds: excludedProductIds ? excludedProductIds.length : 0,
+      requiredProductIds: requiredProductIds ? requiredProductIds.length : 0
     });
 
     // Validera input
@@ -289,6 +290,65 @@ app.post('/api/recommend', requireApiKey, async (req: Request, res: Response) =>
         success: false,
         error: 'Strategi måste vara economic eller optimized',
       });
+    }
+    
+    // Validera att required och excluded inte överlappar
+    if (requiredProductIds && excludedProductIds) {
+      const requiredSet = new Set(requiredProductIds);
+      const conflictIds = excludedProductIds.filter((id: string) => requiredSet.has(id));
+      if (conflictIds.length > 0) {
+        return res.status(400).json({
+          success: false,
+          error: `Produkter kan inte vara både required och excluded: ${conflictIds.join(', ')}`,
+          code: 'REQUIRED_EXCLUDED_CONFLICT'
+        });
+      }
+    }
+    
+    // Validera att antal required inte överstiger maxProducts
+    const effectiveMaxProducts = maxProducts || 3;
+    if (requiredProductIds && requiredProductIds.length > effectiveMaxProducts) {
+      return res.status(400).json({
+        success: false,
+        error: `Antal tvingade produkter (${requiredProductIds.length}) överstiger maxProducts (${effectiveMaxProducts})`,
+        code: 'TOO_MANY_REQUIRED_PRODUCTS'
+      });
+    }
+    
+    // Validera gränsvärden baserat på testresultat
+    const warnings: string[] = [];
+    
+    // Beräkna totalt näringsbehov
+    const totalNeed = (need.N || 0) + (need.P || 0) + (need.K || 0) + (need.S || 0);
+    
+    // Varning: För lågt näringsbehov (< 20 kg/ha totalt)
+    if (totalNeed < 20) {
+      warnings.push(`Lågt totalt näringsbehov (${totalNeed} kg/ha). Rekommendation: minst 20 kg/ha för stabila lösningar.`);
+    }
+    
+    // Varning: För högt N-behov (> 400 kg/ha)
+    if (need.N && need.N > 400) {
+      warnings.push(`Högt N-behov (${need.N} kg/ha). Risk för längre beräkningstid eller minnesfel. Rekommendation: max 400 kg N/ha.`);
+    }
+    
+    // Varning: Extremt högt totalt behov (> 600 kg/ha)
+    if (totalNeed > 600) {
+      warnings.push(`Extremt högt totalt näringsbehov (${totalNeed} kg/ha). Risk för prestanda-problem.`);
+    }
+    
+    // Varning: För många tvingade produkter (lämna minst 1 slot för optimeraren)
+    if (requiredProductIds && requiredProductIds.length >= effectiveMaxProducts) {
+      warnings.push(`Alla produktslots är tvingade (${requiredProductIds.length}/${effectiveMaxProducts}). Optimeraren har ingen flexibilitet.`);
+    }
+    
+    // Varning: Många exkluderade produkter
+    if (excludedProductIds && excludedProductIds.length > 15) {
+      warnings.push(`Många exkluderade produkter (${excludedProductIds.length}). Detta kan begränsa lösningsutrymmet.`);
+    }
+    
+    // Logga varningar
+    if (warnings.length > 0) {
+      console.log('⚠️  Valideringsvarningar:', warnings);
     }
 
   // Hämta produkter från Supabase (behovsstyrt urval för bättre träffbild)
@@ -326,18 +386,36 @@ app.post('/api/recommend', requireApiKey, async (req: Request, res: Response) =>
       topN,
       requiredNutrients: requiredNutrients || undefined,
       algorithmConfig,
+      requiredProductIds: requiredProductIds || undefined,
     };
 
     const solutions = await recommend(need as NutrientNeed, products, options);
 
-    res.json({
+    // Bygg respons med varningar om de finns
+    const response: Record<string, unknown> = {
       success: true,
       count: solutions.length,
       need,
       strategy,
       requiredNutrients: requiredNutrients || [],
+      requiredProductIds: requiredProductIds || [],
       solutions,
-    });
+    };
+    
+    // Lägg till varningar i responsen om det finns några
+    if (warnings.length > 0) {
+      response.warnings = warnings;
+    }
+    
+    // Lägg till rekommenderade gränsvärden i responsen
+    response.limits = {
+      maxProducts: { min: 1, max: 5, recommended: 3 },
+      requiredProductIds: { max: effectiveMaxProducts, recommended: Math.max(1, effectiveMaxProducts - 1) },
+      totalNeed: { min: 20, max: 600, unit: 'kg/ha' },
+      nitrogen: { max: 400, unit: 'kg/ha' }
+    };
+
+    res.json(response);
   } catch (error) {
     console.error('Error in /api/recommend:', error);
     res.status(500).json({

@@ -185,19 +185,31 @@ components:
   schemas:
     NutrientNeed:
       type: object
+      description: |
+        Näringsbehov i kg/ha. Rekommenderade gränsvärden:
+        - Totalt behov: 20-600 kg/ha
+        - N (kväve): max 400 kg/ha för bästa prestanda
       properties:
         N:
           type: number
-          description: Kvävebehov (kg/ha)
+          description: "Kvävebehov (kg/ha). Rekommenderat: 10-400"
+          minimum: 0
+          maximum: 500
         P:
           type: number
-          description: Fosforbehov (kg/ha)
+          description: "Fosforbehov (kg/ha). Rekommenderat: 10-100"
+          minimum: 0
+          maximum: 200
         K:
           type: number
-          description: Kaliumbehov (kg/ha)
+          description: "Kaliumbehov (kg/ha). Rekommenderat: 10-150"
+          minimum: 0
+          maximum: 300
         S:
           type: number
-          description: Svavelbehov (kg/ha)
+          description: "Svavelbehov (kg/ha). Rekommenderat: 5-60"
+          minimum: 0
+          maximum: 100
 
     RecommendRequest:
       type: object
@@ -215,6 +227,7 @@ components:
           minimum: 1
           maximum: 5
           default: 3
+          description: "Max antal produkter. Rekommenderat: 2-4"
         topN:
           type: integer
           default: 10
@@ -226,6 +239,19 @@ components:
           type: array
           items:
             type: string
+          description: |
+            Produkt-IDs att exkludera från optimering.
+            Rekommenderat: max 15 produkter för bästa resultat.
+        requiredProductIds:
+          type: array
+          items:
+            type: string
+          description: |
+            Produkt-IDs som MÅSTE inkluderas i lösningen.
+            Begränsningar:
+            - Får ej överstiga maxProducts
+            - Rekommenderat: maxProducts - 1 för flexibilitet
+            - Produkter måste ha rätt näringsinnehåll för kraven
 
     RecommendResponse:
       type: object
@@ -234,6 +260,23 @@ components:
           type: boolean
         count:
           type: integer
+        warnings:
+          type: array
+          items:
+            type: string
+          description: Varningar om potentiella problem med requesten
+        limits:
+          type: object
+          description: Rekommenderade gränsvärden för optimal prestanda
+          properties:
+            maxProducts:
+              type: object
+            requiredProductIds:
+              type: object
+            totalNeed:
+              type: object
+            nitrogen:
+              type: object
         solutions:
           type: array
           items:

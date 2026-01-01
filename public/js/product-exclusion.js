@@ -3,11 +3,30 @@
  * Copyright (c) 2025 Johan Wågstam <wagis79@gmail.com>
  * All rights reserved.
  * 
- * Product Exclusion Management
- * Hanterar lokalt exkluderade produkter för beräkning
+ * Product Exclusion & Requirement Management
+ * Hanterar exkluderade och tvingade produkter för beräkning
+ * 
+ * Trevalsstatus per produkt:
+ * - Normal (standard): Produkten kan användas om optimeraren väljer den
+ * - Exkluderad: Produkten exkluderas från alla beräkningar
+ * - Tvingad: Produkten MÅSTE inkluderas i alla lösningar
  */
 
 const ProductExclusion = {
+    /**
+     * Hämta produktens nuvarande status
+     * @returns 'normal' | 'excluded' | 'required'
+     */
+    getProductStatus(productId) {
+        if (AppState.requiredProductIds?.includes(productId)) {
+            return 'required';
+        }
+        if (AppState.excludedProductIds?.includes(productId)) {
+            return 'excluded';
+        }
+        return 'normal';
+    },
+
     /**
      * Uppdatera visuell indikation på produktlistknappen
      */
@@ -19,63 +38,138 @@ const ProductExclusion = {
         }
         
         const excludedCount = AppState.excludedProductIds?.length || 0;
-        console.log('[ProductExclusion] updateButton() - excludedCount:', excludedCount);
+        const requiredCount = AppState.requiredProductIds?.length || 0;
+        const totalModified = excludedCount + requiredCount;
         
-        if (excludedCount > 0) {
+        console.log('[ProductExclusion] updateButton() - excluded:', excludedCount, ', required:', requiredCount);
+        
+        if (totalModified > 0) {
             btn.classList.add('has-exclusions');
-            btn.setAttribute('data-excluded-count', excludedCount);
-            btn.setAttribute('data-tooltip', `${excludedCount} produkt(er) exkluderade från beräkning`);
-            console.log('[ProductExclusion] ✅ Knapp uppdaterad med röd ram');
+            btn.setAttribute('data-excluded-count', totalModified);
+            
+            const parts = [];
+            if (excludedCount > 0) parts.push(`${excludedCount} exkluderade`);
+            if (requiredCount > 0) parts.push(`${requiredCount} tvingade`);
+            btn.setAttribute('data-tooltip', parts.join(', '));
+            
+            console.log('[ProductExclusion] ✅ Knapp uppdaterad med markering');
         } else {
             btn.classList.remove('has-exclusions');
             btn.removeAttribute('data-excluded-count');
             btn.removeAttribute('data-tooltip');
-            console.log('[ProductExclusion] Knapp återställd (inga exkluderingar)');
+            console.log('[ProductExclusion] Knapp återställd (inga modifieringar)');
         }
     },
 
     /**
-     * Hantera toggle av produkt-exkludering
+     * Sätt produktens status
+     * @param productId - Produkt-ID
+     * @param status - 'normal' | 'excluded' | 'required'
      */
-    toggle(productId, isChecked) {
-        console.log(`[ProductExclusion] toggle() - productId: ${productId}, isChecked: ${isChecked}`);
+    setStatus(productId, status) {
+        console.log(`[ProductExclusion] setStatus() - productId: ${productId}, status: ${status}`);
         
-        if (!AppState.excludedProductIds) {
-            console.warn('[ProductExclusion] AppState.excludedProductIds är undefined, initierar tom array');
-            AppState.excludedProductIds = [];
-        }
+        // Initialisera arrayer om de inte finns
+        if (!AppState.excludedProductIds) AppState.excludedProductIds = [];
+        if (!AppState.requiredProductIds) AppState.requiredProductIds = [];
         
-        if (isChecked) {
-            // Ta bort från exkluderade
-            AppState.excludedProductIds = AppState.excludedProductIds.filter(id => id !== productId);
-        } else {
-            // Lägg till i exkluderade
-            if (!AppState.excludedProductIds.includes(productId)) {
-                AppState.excludedProductIds.push(productId);
-            }
+        // Ta bort från båda listor först
+        AppState.excludedProductIds = AppState.excludedProductIds.filter(id => id !== productId);
+        AppState.requiredProductIds = AppState.requiredProductIds.filter(id => id !== productId);
+        
+        // Lägg till i rätt lista baserat på status
+        if (status === 'excluded') {
+            AppState.excludedProductIds.push(productId);
+        } else if (status === 'required') {
+            AppState.requiredProductIds.push(productId);
         }
+        // 'normal' = inte i någon lista
         
         // Spara till sessionStorage
         Storage.saveExcludedProducts();
+        Storage.saveRequiredProducts();
         
         // Uppdatera knappens utseende
         this.updateButton();
         
         // Uppdatera rad-styling
-        const row = document.querySelector(`tr[data-product-id="${productId}"]`);
-        if (row) {
-            if (isChecked) {
-                row.classList.remove('product-row-excluded');
-            } else {
-                row.classList.add('product-row-excluded');
-            }
-        }
+        this.updateRowStyling(productId, status);
         
         // Uppdatera footer-text och reset-knapp
         this.updateModalFooter();
         
-        console.log(`[ProductExclusion] ✅ Produkt ${productId} ${isChecked ? 'inkluderad' : 'exkluderad'}. Totalt exkluderade: ${AppState.excludedProductIds.length}`);
-        console.log('[ProductExclusion] Aktuella exkluderade produkter:', AppState.excludedProductIds);
+        console.log(`[ProductExclusion] ✅ Produkt ${productId} satt till ${status}`);
+        console.log('[ProductExclusion] Exkluderade:', AppState.excludedProductIds.length, ', Tvingade:', AppState.requiredProductIds.length);
+    },
+
+    /**
+     * Uppdatera rad-styling baserat på status
+     */
+    updateRowStyling(productId, status) {
+        const row = document.querySelector(`tr[data-product-id="${productId}"]`);
+        if (!row) return;
+        
+        // Ta bort alla status-klasser
+        row.classList.remove('product-row-excluded', 'product-row-required');
+        
+        // Lägg till rätt klass
+        if (status === 'excluded') {
+            row.classList.add('product-row-excluded');
+        } else if (status === 'required') {
+            row.classList.add('product-row-required');
+        }
+    },
+
+    /**
+     * Hantera klick på statusknapp
+     */
+    cycleStatus(productId) {
+        const currentStatus = this.getProductStatus(productId);
+        
+        // Cykla: normal -> required -> excluded -> normal
+        let newStatus;
+        switch (currentStatus) {
+            case 'normal':
+                newStatus = 'required';
+                break;
+            case 'required':
+                newStatus = 'excluded';
+                break;
+            case 'excluded':
+            default:
+                newStatus = 'normal';
+                break;
+        }
+        
+        this.setStatus(productId, newStatus);
+        
+        // Uppdatera knappen i tabellen
+        this.updateStatusButton(productId, newStatus);
+    },
+
+    /**
+     * Uppdatera statusknappens utseende
+     */
+    updateStatusButton(productId, status) {
+        const btn = document.querySelector(`button[data-product-id="${productId}"]`);
+        if (!btn) return;
+        
+        // Uppdatera knappens utseende och text
+        btn.className = 'status-btn status-' + status;
+        
+        switch (status) {
+            case 'required':
+                btn.innerHTML = '🔒 Tvingad';
+                btn.title = 'Klicka för att exkludera';
+                break;
+            case 'excluded':
+                btn.innerHTML = '❌ Exkluderad';
+                btn.title = 'Klicka för att återställa';
+                break;
+            default:
+                btn.innerHTML = '✓ Normal';
+                btn.title = 'Klicka för att tvinga';
+        }
     },
 
     /**
@@ -88,10 +182,17 @@ const ProductExclusion = {
         
         const totalProducts = AppState.products?.length || 0;
         const excludedCount = AppState.excludedProductIds?.length || 0;
+        const requiredCount = AppState.requiredProductIds?.length || 0;
         const activeCount = totalProducts - excludedCount;
         
-        if (excludedCount > 0) {
-            countText.innerHTML = `<strong>${activeCount}</strong> av ${totalProducts} produkter aktiva (<span style="color: #ff4444;">${excludedCount} exkluderade</span>)`;
+        const hasModifications = excludedCount > 0 || requiredCount > 0;
+        
+        if (hasModifications) {
+            let statusParts = [];
+            if (excludedCount > 0) statusParts.push(`<span style="color: #ff4444;">${excludedCount} exkluderade</span>`);
+            if (requiredCount > 0) statusParts.push(`<span style="color: #28a745;">${requiredCount} tvingade</span>`);
+            
+            countText.innerHTML = `<strong>${activeCount}</strong> av ${totalProducts} produkter aktiva (${statusParts.join(', ')})`;
             resetBtn.disabled = false;
         } else {
             countText.innerHTML = `<strong>${totalProducts}</strong> tillgängliga produkter för beräkning`;
@@ -100,24 +201,23 @@ const ProductExclusion = {
     },
 
     /**
-     * Återställ alla exkluderade produkter
+     * Återställ alla exkluderade och tvingade produkter
      */
     resetAll() {
         Storage.clearExcludedProducts();
+        Storage.clearRequiredProducts();
         this.updateButton();
         
-        // Uppdatera alla checkboxar och rader i tabellen
-        const checkboxes = document.querySelectorAll('.product-checkbox');
-        checkboxes.forEach(cb => {
-            cb.checked = true;
-            const row = cb.closest('tr');
-            if (row) {
-                row.classList.remove('product-row-excluded');
-            }
+        // Uppdatera alla rader och knappar i tabellen
+        const rows = document.querySelectorAll('tr[data-product-id]');
+        rows.forEach(row => {
+            const productId = row.getAttribute('data-product-id');
+            row.classList.remove('product-row-excluded', 'product-row-required');
+            this.updateStatusButton(productId, 'normal');
         });
         
         this.updateModalFooter();
-        console.log('🗑️ Alla produktexkluderingar återställda');
+        console.log('🗑️ Alla produktval återställda (exkluderade och tvingade)');
     },
 
     /**
@@ -146,23 +246,45 @@ const ProductExclusion = {
                     return aNum - bNum;
                 });
                 
-                // Bygg tabell med checkboxar
+                // Bygg tabell med statusknapp per rad
                 tbody.innerHTML = products.map(p => {
                     const articleNr = p.id.replace('prod-', '');
-                    const isExcluded = AppState.excludedProductIds.includes(p.id);
+                    const status = this.getProductStatus(p.id);
+                    
                     const formatNutrient = (val) => {
                         if (!val || val === 0) return '<span class="nutrient-zero">-</span>';
                         return `<span class="nutrient-value">${val}</span>`;
                     };
                     
+                    // Skapa statusknapp
+                    let btnClass = 'status-btn status-' + status;
+                    let btnText, btnTitle;
+                    switch (status) {
+                        case 'required':
+                            btnText = '🔒 Tvingad';
+                            btnTitle = 'Klicka för att exkludera';
+                            break;
+                        case 'excluded':
+                            btnText = '❌ Exkluderad';
+                            btnTitle = 'Klicka för att återställa';
+                            break;
+                        default:
+                            btnText = '✓ Normal';
+                            btnTitle = 'Klicka för att tvinga';
+                    }
+                    
+                    const rowClass = status === 'excluded' ? 'product-row-excluded' : 
+                                     status === 'required' ? 'product-row-required' : '';
+                    
                     return `
-                        <tr data-product-id="${p.id}" class="${isExcluded ? 'product-row-excluded' : ''}">
-                            <td class="product-checkbox-cell">
-                                <input type="checkbox" 
-                                       class="product-checkbox" 
-                                       ${isExcluded ? '' : 'checked'} 
-                                       onchange="ProductExclusion.toggle('${p.id}', this.checked)"
-                                       title="${isExcluded ? 'Klicka för att inkludera' : 'Klicka för att exkludera'}">
+                        <tr data-product-id="${p.id}" class="${rowClass}">
+                            <td class="product-status-cell">
+                                <button class="${btnClass}" 
+                                        data-product-id="${p.id}"
+                                        onclick="ProductExclusion.cycleStatus('${p.id}')"
+                                        title="${btnTitle}">
+                                    ${btnText}
+                                </button>
                             </td>
                             <td>${articleNr}</td>
                             <td><strong>${p.name}</strong></td>
@@ -204,6 +326,19 @@ const ProductExclusion = {
      */
     closeModal() {
         document.getElementById('productModal').style.display = 'none';
+    },
+
+    /**
+     * Legacy-kompatibilitet: toggle (används av gamla onclick-handlers)
+     * @deprecated Använd setStatus() istället
+     */
+    toggle(productId, isChecked) {
+        // Konvertera gammalt beteende till nytt
+        if (isChecked) {
+            this.setStatus(productId, 'normal');
+        } else {
+            this.setStatus(productId, 'excluded');
+        }
     }
 };
 
@@ -231,17 +366,21 @@ function updateProductListButton() {
 // Debug-funktion - kan anropas från konsollen
 function debugExcludedProducts() {
     console.log('===========================================');
-    console.log('🔍 DEBUG: Produktexkludering');
+    console.log('🔍 DEBUG: Produktexkludering & Tvingade');
     console.log('===========================================');
     console.log('AppState.excludedProductIds:', AppState.excludedProductIds);
+    console.log('AppState.requiredProductIds:', AppState.requiredProductIds);
     console.log('Antal exkluderade:', AppState.excludedProductIds?.length || 0);
-    console.log('sessionStorage:', sessionStorage.getItem('fest_excludedProducts'));
+    console.log('Antal tvingade:', AppState.requiredProductIds?.length || 0);
+    console.log('sessionStorage (excluded):', sessionStorage.getItem('fest_excludedProducts'));
+    console.log('sessionStorage (required):', sessionStorage.getItem('fest_requiredProducts'));
     console.log('AppState.products antal:', AppState.products?.length || 0);
     console.log('===========================================');
     return {
         excludedIds: AppState.excludedProductIds,
-        count: AppState.excludedProductIds?.length || 0,
-        sessionStorage: sessionStorage.getItem('fest_excludedProducts')
+        requiredIds: AppState.requiredProductIds,
+        excludedCount: AppState.excludedProductIds?.length || 0,
+        requiredCount: AppState.requiredProductIds?.length || 0
     };
 }
 
