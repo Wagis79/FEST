@@ -21,6 +21,14 @@ import { NutrientNeed } from '../models/NutrientNeed';
 import { Strategy } from '../engine/scoring';
 import { Product } from '../models/Product';
 import { 
+  validateBody,
+  RecommendRequestSchema,
+  OptimizeV7RequestSchema,
+  NutrientNeedRequestSchema,
+  generateInputWarnings,
+  type RecommendRequest,
+} from './validation';
+import { 
   supabase,
   supabaseAdmin,
   PRODUCTS_TABLE, 
@@ -324,17 +332,13 @@ app.get('/api/products', requireApiKey, async (req: Request, res: Response) => {
  * POST /api/recommend
  * Få rekommendationer baserat på näringsbehov
  * Kräver API-nyckel för extern åtkomst (om konfigurerat)
- * 
- * Body: {
- *   need: { N?: number, P?: number, K?: number, S?: number },
- *   strategy?: 'cheapest' | 'balanced' | 'most_exact',
- *   maxProducts?: 1 | 2,
- *   topN?: number
- * }
+ * Validering sker via Zod-schema
  */
-app.post('/api/recommend', requireApiKey, async (req: Request, res: Response) => {
+app.post('/api/recommend', requireApiKey, validateBody(RecommendRequestSchema), async (req: Request, res: Response) => {
   try {
-  const { need, strategy = 'economic', maxProducts, topN = 10, requiredNutrients, excludedProductIds, requiredProductIds } = req.body;
+    // Body är nu validerad och typkontrollerad via Zod
+    const validatedData = req.body as RecommendRequest;
+    const { need, strategy, maxProducts, topN, requiredNutrients, excludedProductIds, requiredProductIds } = validatedData;
 
     log.request('POST', '/api/recommend', { 
       need, 
@@ -346,86 +350,8 @@ app.post('/api/recommend', requireApiKey, async (req: Request, res: Response) =>
       requiredCount: requiredProductIds?.length || 0
     });
 
-    // Validera input
-    if (!need || typeof need !== 'object') {
-      return res.status(400).json({
-        success: false,
-        error: 'Näringsbehov (need) krävs och måste vara ett objekt',
-      });
-    }
-
-    // Validera att minst ett näringsämne finns
-    if (!need.N && !need.P && !need.K && !need.S) {
-      return res.status(400).json({
-        success: false,
-        error: 'Minst ett näringsämne måste anges',
-      });
-    }
-
-    // Validera strategi
-    const validStrategies: Strategy[] = ['economic', 'optimized'];
-    if (!validStrategies.includes(strategy)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Strategi måste vara economic eller optimized',
-      });
-    }
-    
-    // Validera att required och excluded inte överlappar
-    if (requiredProductIds && excludedProductIds) {
-      const requiredSet = new Set(requiredProductIds);
-      const conflictIds = excludedProductIds.filter((id: string) => requiredSet.has(id));
-      if (conflictIds.length > 0) {
-        return res.status(400).json({
-          success: false,
-          error: `Produkter kan inte vara både required och excluded: ${conflictIds.join(', ')}`,
-          code: 'REQUIRED_EXCLUDED_CONFLICT'
-        });
-      }
-    }
-    
-    // Validera att antal required inte överstiger maxProducts
-    const effectiveMaxProducts = maxProducts || 3;
-    if (requiredProductIds && requiredProductIds.length > effectiveMaxProducts) {
-      return res.status(400).json({
-        success: false,
-        error: `Antal tvingade produkter (${requiredProductIds.length}) överstiger maxProducts (${effectiveMaxProducts})`,
-        code: 'TOO_MANY_REQUIRED_PRODUCTS'
-      });
-    }
-    
-    // Validera gränsvärden baserat på testresultat
-    const warnings: string[] = [];
-    
-    // Beräkna totalt näringsbehov
-    const totalNeed = (need.N || 0) + (need.P || 0) + (need.K || 0) + (need.S || 0);
-    
-    // Varning: För lågt näringsbehov (< 20 kg/ha totalt)
-    if (totalNeed < 20) {
-      warnings.push(`Lågt totalt näringsbehov (${totalNeed} kg/ha). Rekommendation: minst 20 kg/ha för stabila lösningar.`);
-    }
-    
-    // Varning: För högt N-behov (> 400 kg/ha)
-    if (need.N && need.N > 400) {
-      warnings.push(`Högt N-behov (${need.N} kg/ha). Risk för längre beräkningstid eller minnesfel. Rekommendation: max 400 kg N/ha.`);
-    }
-    
-    // Varning: Extremt högt totalt behov (> 600 kg/ha)
-    if (totalNeed > 600) {
-      warnings.push(`Extremt högt totalt näringsbehov (${totalNeed} kg/ha). Risk för prestanda-problem.`);
-    }
-    
-    // Varning: För många tvingade produkter (lämna minst 1 slot för optimeraren)
-    if (requiredProductIds && requiredProductIds.length >= effectiveMaxProducts) {
-      warnings.push(`Alla produktslots är tvingade (${requiredProductIds.length}/${effectiveMaxProducts}). Optimeraren har ingen flexibilitet.`);
-    }
-    
-    // Varning: Många exkluderade produkter
-    if (excludedProductIds && excludedProductIds.length > 15) {
-      warnings.push(`Många exkluderade produkter (${excludedProductIds.length}). Detta kan begränsa lösningsutrymmet.`);
-    }
-    
-    // Logga varningar
+    // Generera varningar baserat på input
+    const warnings = generateInputWarnings(validatedData);
     if (warnings.length > 0) {
       log.warn('Valideringsvarningar', { warnings });
     }
@@ -461,7 +387,7 @@ app.post('/api/recommend', requireApiKey, async (req: Request, res: Response) =>
     // Kör rekommendationsmotor med användarens val av maxProducts.
     const options: RecommendOptions = {
       strategy,
-      maxProducts: maxProducts,
+      maxProducts: maxProducts as 1 | 2 | 3 | 4 | 5,
       topN,
       requiredNutrients: requiredNutrients || undefined,
       algorithmConfig,
@@ -489,7 +415,7 @@ app.post('/api/recommend', requireApiKey, async (req: Request, res: Response) =>
     // Lägg till rekommenderade gränsvärden i responsen
     response.limits = {
       maxProducts: { min: 1, max: 5, recommended: 3 },
-      requiredProductIds: { max: effectiveMaxProducts, recommended: Math.max(1, effectiveMaxProducts - 1) },
+      requiredProductIds: { max: maxProducts, recommended: Math.max(1, maxProducts - 1) },
       totalNeed: { min: 20, max: 600, unit: 'kg/ha' },
       nitrogen: { max: 400, unit: 'kg/ha' }
     };

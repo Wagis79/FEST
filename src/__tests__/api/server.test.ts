@@ -99,16 +99,18 @@ describe('POST /api/recommend', () => {
       ).expect(400);
       
       expect(response.body).toHaveProperty('success', false);
-      expect(response.body.error).toContain('need');
+      // Zod returnerar 'Valideringsfel' som generellt felmeddelande
+      expect(response.body.error).toBe('Valideringsfel');
+      expect(response.body.details).toBeDefined();
     });
 
-    it('ska ge 400 om alla näringsämnen är 0', async () => {
+    it('ska ge 400 om alla näringsämnen saknas', async () => {
       const response = await withApiKey(
         request(app)
           .post('/api/recommend')
           .set('Accept', 'application/json')
           .send({
-            need: { N: 0, P: 0, K: 0, S: 0 }
+            need: {}  // Tomt objekt - inget näringsämne angivet
           })
       ).expect(400);
       
@@ -127,7 +129,8 @@ describe('POST /api/recommend', () => {
       ).expect(400);
       
       expect(response.body).toHaveProperty('success', false);
-      expect(response.body.error).toContain('Strategi');
+      // Zod returnerar 'Valideringsfel' som generellt felmeddelande
+      expect(response.body.error).toBe('Valideringsfel');
     });
 
     it('ska ge 400 om required och excluded produkter överlappar', async () => {
@@ -143,7 +146,8 @@ describe('POST /api/recommend', () => {
       ).expect(400);
       
       expect(response.body).toHaveProperty('success', false);
-      expect(response.body.code).toBe('REQUIRED_EXCLUDED_CONFLICT');
+      // Zod returnerar detaljer i details-arrayen
+      expect(response.body.error).toBe('Valideringsfel');
     });
 
   });

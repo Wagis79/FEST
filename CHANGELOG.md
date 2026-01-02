@@ -2,6 +2,34 @@
 
 Alla viktiga ändringar i projektet dokumenteras här.
 
+## [2.8.1] - 2026-01-02
+
+### ✅ Zod Input-validering
+
+#### Typsäker API-validering
+- **Zod-scheman** - Ersatt manuell validering med deklarativa scheman
+  - `src/api/validation.ts` - Centraliserade valideringsscheman
+  - `RecommendRequestSchema` - Validering av `/api/recommend`
+  - `OptimizeV7RequestSchema` - Validering av `/api/optimize-v7`
+  - `NutrientNeedRequestSchema` - Validering av näringsbehov
+  - `M3WebhookSchema` - Validering av M3-webhook payload
+
+#### Fördelar
+- Automatisk TypeScript-typning från scheman
+- Konsistenta felmeddelanden med `details`-array
+- Max-/min-värden valideras (N max 500, P max 200, K max 300, S max 100)
+- Refine-validering för komplexa regler (required/excluded overlap)
+
+#### Ny middleware
+- `validateBody(schema)` - Validerar request body
+- `validateQuery(schema)` - Validerar query-parametrar
+- `generateInputWarnings(data)` - Genererar varningar för gränsvärden
+
+#### Ny dependency
+- `zod` ^3.x
+
+---
+
 ## [2.8.0] - 2026-01-02
 
 ### 📊 Strukturerad loggning
