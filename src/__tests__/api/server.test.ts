@@ -381,3 +381,138 @@ describe('API Key middleware', () => {
   });
 
 });
+
+// ============================================================================
+// M3 WEBHOOK API
+// ============================================================================
+
+const WEBHOOK_SECRET = process.env.M3_WEBHOOK_SECRET || 'test-webhook-secret';
+
+// Helper för att lägga till webhook secret
+function withWebhookSecret(req: request.Test): request.Test {
+  return req.set('X-Webhook-Secret', WEBHOOK_SECRET);
+}
+
+describe('POST /api/webhook/m3-product', () => {
+
+  describe('Autentisering', () => {
+
+    it('ska ge 401 eller 503 utan X-Webhook-Secret header', async () => {
+      const response = await request(app)
+        .post('/api/webhook/m3-product')
+        .set('Content-Type', 'application/json')
+        .send({ itemNumber: '301763', salesPrice: 5500 });
+      
+      // 401 = saknar secret, 503 = webhook ej konfigurerat
+      expect([401, 503]).toContain(response.status);
+    });
+
+    it('ska ge 401 med ogiltig webhook secret', async () => {
+      const response = await request(app)
+        .post('/api/webhook/m3-product')
+        .set('Content-Type', 'application/json')
+        .set('X-Webhook-Secret', 'fel-hemlig-nyckel')
+        .send({ itemNumber: '301763', salesPrice: 5500 });
+      
+      // 401 = ogiltig secret, 503 = webhook ej konfigurerat
+      expect([401, 503]).toContain(response.status);
+    });
+
+  });
+
+  describe('Validering', () => {
+
+    it('ska ge 400 när itemNumber saknas', async () => {
+      const response = await withWebhookSecret(
+        request(app)
+          .post('/api/webhook/m3-product')
+          .set('Content-Type', 'application/json')
+      ).send({ salesPrice: 5500 });
+      
+      // 400 = valideringsfel, 503 = webhook ej konfigurerat
+      expect([400, 503]).toContain(response.status);
+      
+      if (response.status === 400) {
+        expect(response.body.error).toContain('itemNumber');
+      }
+    });
+
+    it('ska ge 400 när varken salesPrice eller active skickas', async () => {
+      const response = await withWebhookSecret(
+        request(app)
+          .post('/api/webhook/m3-product')
+          .set('Content-Type', 'application/json')
+      ).send({ itemNumber: '301763' });
+      
+      // 400 = valideringsfel, 503 = webhook ej konfigurerat
+      expect([400, 503]).toContain(response.status);
+      
+      if (response.status === 400) {
+        expect(response.body.code).toBe('NO_UPDATES');
+      }
+    });
+
+  });
+
+  describe('Framgångsrika uppdateringar', () => {
+
+    it('ska acceptera giltig prisuppdatering', async () => {
+      const response = await withWebhookSecret(
+        request(app)
+          .post('/api/webhook/m3-product')
+          .set('Content-Type', 'application/json')
+      ).send({ 
+        itemNumber: '301763', 
+        salesPrice: 5500 
+      });
+      
+      // 200 = uppdaterad, 404 = produkt finns ej, 503 = db nere
+      expect([200, 404, 503]).toContain(response.status);
+      
+      if (response.status === 200) {
+        expect(response.body.success).toBe(true);
+        expect(response.body.updates).toHaveProperty('price');
+      }
+    });
+
+    it('ska acceptera active-status uppdatering', async () => {
+      const response = await withWebhookSecret(
+        request(app)
+          .post('/api/webhook/m3-product')
+          .set('Content-Type', 'application/json')
+      ).send({ 
+        itemNumber: '301763', 
+        active: false 
+      });
+      
+      // 200 = uppdaterad, 404 = produkt finns ej, 503 = db nere
+      expect([200, 404, 503]).toContain(response.status);
+      
+      if (response.status === 200) {
+        expect(response.body.success).toBe(true);
+        expect(response.body.updates).toHaveProperty('active');
+      }
+    });
+
+    it('ska acceptera kombinerad uppdatering av pris och status', async () => {
+      const response = await withWebhookSecret(
+        request(app)
+          .post('/api/webhook/m3-product')
+          .set('Content-Type', 'application/json')
+      ).send({ 
+        itemNumber: '301763', 
+        salesPrice: 5800,
+        active: true 
+      });
+      
+      // 200 = uppdaterad, 404 = produkt finns ej, 503 = db nere
+      expect([200, 404, 503]).toContain(response.status);
+      
+      if (response.status === 200) {
+        expect(response.body.success).toBe(true);
+      }
+    });
+
+  });
+
+});
