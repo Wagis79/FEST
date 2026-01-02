@@ -18,6 +18,9 @@ const CropsAdmin = {
   async init() {
     console.log('[CropsAdmin] Initializing...');
     
+    // Registrera event listeners
+    this.setupEventListeners();
+    
     // Get password from session
     const SESSION_KEY = 'fest_admin_session';
     const session = sessionStorage.getItem(SESSION_KEY);
@@ -38,6 +41,38 @@ const CropsAdmin = {
     }
     
     await this.loadCrops();
+  },
+  
+  setupEventListeners() {
+    // Lägg till gröda-knapp
+    const addBtn = document.getElementById('addCropBtn');
+    if (addBtn) {
+      addBtn.addEventListener('click', () => this.openAddModal());
+    }
+    
+    // Sök-input
+    const searchInput = document.getElementById('search-input');
+    if (searchInput) {
+      searchInput.addEventListener('input', () => this.handleSearch());
+    }
+    
+    // Stäng modal-knapp (X)
+    const closeBtn = document.getElementById('closeModalBtn');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => this.closeModal());
+    }
+    
+    // Avbryt-knapp i modal
+    const cancelBtn = document.getElementById('cancelModalBtn');
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', () => this.closeModal());
+    }
+    
+    // Formulär submit
+    const form = document.getElementById('crop-form');
+    if (form) {
+      form.addEventListener('submit', (e) => this.handleSubmit(e));
+    }
   },
   
   getHeaders() {

@@ -24,8 +24,10 @@ import type { NutrientNeed } from '../models/NutrientNeed';
 import { 
   validateBody,
   RecommendRequestSchema,
+  OptimizeV7APIRequestSchema,
   generateInputWarnings,
   type RecommendRequest,
+  type OptimizeV7APIRequest,
 } from './validation';
 import type { DBProduct } from './supabase';
 import { 
@@ -56,8 +58,17 @@ function getErrorMessage(error: unknown): string {
   return String(error);
 }
 
-// Admin password from environment
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+// Admin password from environment - required in production
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+if (!ADMIN_PASSWORD && process.env.NODE_ENV === 'production') {
+  log.error('ADMIN_PASSWORD måste sättas i produktion');
+  process.exit(1);
+}
+// I development: fallback till test-lösenord med varning
+if (!ADMIN_PASSWORD) {
+  log.warn('ADMIN_PASSWORD ej satt - använder "admin123" (endast för utveckling)');
+}
+const EFFECTIVE_ADMIN_PASSWORD = ADMIN_PASSWORD || 'admin123';
 
 // M3 Webhook secret for ERP integration
 const M3_WEBHOOK_SECRET = process.env.M3_WEBHOOK_SECRET || '';
@@ -81,7 +92,7 @@ if (API_KEYS.size > 0) {
 function requireAdminPassword(req: Request, res: Response, next: NextFunction) {
   const password = req.headers['x-admin-password'];
   
-  if (password === ADMIN_PASSWORD) {
+  if (password === EFFECTIVE_ADMIN_PASSWORD) {
     next();
   } else {
     res.status(403).json({
@@ -238,9 +249,9 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // Needed for Swagger UI
-      scriptSrcAttr: ["'unsafe-inline'"], // Allow inline event handlers (onclick, etc.)
-      styleSrc: ["'self'", "'unsafe-inline'"], // Needed for Swagger UI
+      scriptSrc: ["'self'", "'unsafe-eval'"], // unsafe-eval needed for Swagger UI
+      scriptSrcAttr: ["'none'"], // No inline event handlers allowed
+      styleSrc: ["'self'", "'unsafe-inline'"], // Needed for Swagger UI inline styles
       imgSrc: ["'self'", "data:", "https:"],
       connectSrc: ["'self'"],
     },
@@ -248,8 +259,34 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false, // Allow embedding for Swagger UI
 }));
 
-// CORS
-app.use(cors());
+// CORS - Konfigurerad med vitlistade domäner
+const allowedOrigins = process.env.CORS_ALLOWED_ORIGINS
+  ? process.env.CORS_ALLOWED_ORIGINS.split(',').map((origin) => origin.trim())
+  : ['http://localhost:3000', 'http://localhost:5173', 'http://127.0.0.1:3000'];
+
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    // Tillåt requests utan origin (same-origin, server-to-server, Postman, etc.)
+    if (!origin) {
+      return callback(null, true);
+    }
+    // Kontrollera om origin finns i vitlistan
+    if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+      return callback(null, true);
+    }
+    // I development-läge, tillåt alla localhost-varianter
+    if (process.env.NODE_ENV !== 'production' && (origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1'))) {
+      return callback(null, true);
+    }
+    log.warn('CORS blockad för origin', { origin, allowedOrigins });
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Admin-Password', 'X-API-Key', 'X-Requested-With', 'X-Webhook-Secret'],
+};
+
+app.use(cors(corsOptions));
 
 // JSON body parser
 app.use(express.json());
@@ -479,28 +516,13 @@ app.post('/api/recommend', requireApiKey, validateBody(RecommendRequestSchema), 
  * - Prispall med 3 strategier via no-good cuts
  * - Warnings för ej aktiverade ämnen med hög nivå
  */
-app.post('/api/optimize-v7', blockExternalAccess, async (req: Request, res: Response) => {
+app.post('/api/optimize-v7', blockExternalAccess, validateBody(OptimizeV7APIRequestSchema), async (req: Request, res: Response) => {
   try {
-    const { 
-      targets, 
-      mustFlags = {}, 
-      maxProducts = 2, 
-      minDose = 100, 
-      maxDose = 600 
-    } = req.body;
+    // Body är nu validerad och typkontrollerad via Zod
+    const validatedData = req.body as OptimizeV7APIRequest;
+    const { targets, mustFlags, maxProducts, minDose, maxDose } = validatedData;
 
     log.request('POST', '/api/optimize-v7', { targets, mustFlags, maxProducts, minDose, maxDose });
-
-    // Validera targets
-    if (!targets || typeof targets !== 'object') {
-      return res.status(400).json({
-        success: false,
-        error: 'targets krävs och måste vara ett objekt med N, P, K, S',
-      });
-    }
-
-    // Validera maxProducts (hård cap 4)
-    const maxProd = Math.min(4, Math.max(1, parseInt(maxProducts) || 2));
 
     // Hämta alla produkter
     const products = await getAllProductsForRecommendation();
@@ -528,7 +550,7 @@ app.post('/api/optimize-v7', blockExternalAccess, async (req: Request, res: Resp
         mustK: mustFlags.mustK || false,
         mustS: mustFlags.mustS || false,
       },
-      maxProductsUser: maxProd,
+      maxProductsUser: maxProducts,
       minDoseKgHa: minDose,
       maxDoseKgHa: maxDose,
     };

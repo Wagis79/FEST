@@ -23,7 +23,7 @@
                 <a href="/admin.html" class="btn btn-secondary" style="background: rgba(255,255,255,0.2); color: white; border: none;">
                     🔧 Admin
                 </a>
-                <button id="productListBtn" class="product-list-btn" onclick="showProductList()">
+                <button id="productListBtn" class="product-list-btn">
                     📋 Visa tillgängliga produkter
                 </button>
             </div>
@@ -35,21 +35,21 @@
                 <!-- Toggle mellan Enkel och Avancerad (döljs i inköpslista-läge) -->
                 <div class="balance-mode-toggle" id="formModeToggleWrapper">
                     <span class="toggle-label active" id="label-basic">📊 Enkel</span>
-                    <div class="toggle-switch" id="formModeToggle" onclick="toggleFormMode()">
+                    <div class="toggle-switch" id="formModeToggle">
                         <div class="toggle-slider"></div>
                     </div>
                     <span class="toggle-label" id="label-advanced">🔬 Avancerad</span>
                 </div>
                 
                 <!-- Tillbaka-knapp (visas endast i inköpslista-läge) -->
-                <button id="backToCalcBtn" class="btn-back-tabs" onclick="TabManager.showCalculationTabs()" style="display: none;">
+                <button id="backToCalcBtn" class="btn-back-tabs" style="display: none;">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M19 12H5M12 19l-7-7 7-7"/>
                     </svg>
                     Tillbaka till beräkning
                 </button>
                 
-                <button class="tab" onclick="switchTab('purchase')" style="margin-left: auto;">Inköpslista 📋<span id="purchaseCount" style="background: #4CAF50; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.8rem; margin-left: 5px; display: none;">0</span></button>
+                <button class="tab" data-tab="purchase" style="margin-left: auto;">Inköpslista 📋<span id="purchaseCount" style="background: #4CAF50; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.8rem; margin-left: 5px; display: none;">0</span></button>
             </div>
 
             <!-- Enkel flik -->
@@ -147,7 +147,7 @@
                     <!-- Toggle mellan Förfrukt och Växtnäringsbalans -->
                     <div class="balance-mode-toggle">
                         <span class="toggle-label active" id="label-forfrukt">🌾 Förfrukt</span>
-                        <div class="toggle-switch" id="balanceToggle" onclick="toggleBalanceMode()">
+                        <div class="toggle-switch" id="balanceToggle">
                             <div class="toggle-slider"></div>
                         </div>
                         <span class="toggle-label" id="label-balance">📊 Växtnäringsbalans</span>
@@ -193,7 +193,7 @@
                             </div>
                         </div>
 
-                        <button type="button" class="btn" onclick="calculateBalance()" style="margin-top: 20px;">Beräkna näringsbalans från förfrukt</button>
+                        <button type="button" class="btn" id="calculateBalanceBtn" style="margin-top: 20px;">Beräkna näringsbalans från förfrukt</button>
                     </div>
 
                     <!-- Sektion för direkt Växtnäringsbalans -->
@@ -221,7 +221,7 @@
                             </div>
                         </div>
 
-                        <button type="button" class="btn" onclick="useDirectBalance()" style="margin-top: 20px;">Använd angiven näringsbalans</button>
+                        <button type="button" class="btn" id="useDirectBalanceBtn" style="margin-top: 20px;">Använd angiven näringsbalans</button>
                     </div>
 
                     <!-- Resultat av balansberäkning -->
@@ -390,8 +390,8 @@
                 <input type="number" id="listItemHectares" placeholder="t.ex. 25" step="0.1" min="0.1" required>
             </div>
             <div class="modal-buttons">
-                <button type="button" class="btn btn-secondary" style="flex: 1;" onclick="closeAddToListModal()">Avbryt</button>
-                <button type="button" class="btn" style="flex: 1;" onclick="confirmAddToList()">Lägg till</button>
+                <button type="button" class="btn btn-secondary" style="flex: 1;" id="cancelAddToListBtn">Avbryt</button>
+                <button type="button" class="btn" style="flex: 1;" id="confirmAddToListBtn">Lägg till</button>
             </div>
         </div>
     </div>
@@ -415,8 +415,8 @@
                 </label>
             </div>
             <div class="modal-buttons" style="margin-top: 20px;">
-                <button type="button" class="btn btn-secondary" style="flex: 1;" onclick="PurchaseList.closePrintOptionsModal()">Avbryt</button>
-                <button type="button" class="btn" style="flex: 1;" onclick="PurchaseList.confirmPrint()">🖨️ Generera PDF</button>
+                <button type="button" class="btn btn-secondary" style="flex: 1;" id="cancelPrintBtn">Avbryt</button>
+                <button type="button" class="btn" style="flex: 1;" id="confirmPrintBtn">🖨️ Generera PDF</button>
             </div>
         </div>
     </div>
@@ -432,28 +432,15 @@
     <script src="/js/tabs.js"></script>
     <script src="/js/purchase-list.js"></script>
     <script src="/js/forms.js"></script>
+    <script src="/js/event-listeners.js"></script>
     <script src="/js/app.js"></script>
-    <script>
-        // Setup integer inputs to prevent decimals on key fields
-        function setupIntegerInputs() {
-            const integerInputs = ['yield', 'nInput', 'pInput', 'kInput', 'sInput'];
-            integerInputs.forEach(id => {
-                const input = document.getElementById(id);
-                if (input) {
-                    input.addEventListener('input', function() {
-                        this.value = this.value.replace(/[.,]/g, '');
-                    });
-                }
-            });
-        }
-    </script>
 
     <!-- Produktlista Modal -->
     <div id="productModal" class="product-modal">
         <div class="product-modal-content">
             <div class="product-modal-header">
                 <h2>📋 Tillgängliga produkter för beräkning</h2>
-                <button class="product-modal-close" onclick="closeProductList()">&times;</button>
+                <button class="product-modal-close">&times;</button>
             </div>
             <div class="product-modal-body">
                 <table class="product-table">
@@ -479,29 +466,15 @@
             </div>
             <div class="product-modal-footer" id="productModalFooter">
                 <span id="productCountText">Laddar...</span>
-                <button id="resetExclusionsBtn" class="reset-exclusions-btn" onclick="resetExcludedProducts()" disabled>
+                <button id="resetExclusionsBtn" class="reset-exclusions-btn" disabled>
                     🔄 Återställ alla
                 </button>
             </div>
         </div>
     </div>
-
-    <script>
-        // Stäng modal vid klick utanför
-        window.onclick = function(event) {
-            const modal = document.getElementById('productModal');
-            if (event.target === modal) {
-                closeProductList();
-            }
-        }
-    </script>
     
     <!-- Loading Animation Scripts -->
     <script src="/loader/spreader-svg.js"></script>
     <script src="/loader/spreader-loader.js"></script>
-    <script>
-        // Initiera loader med 7 sekunders minimitid
-        const spreaderLoader = new SpreaderLoader({ minDisplayTime: 7000 });
-    </script>
 </body>
 </html>

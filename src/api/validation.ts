@@ -79,7 +79,39 @@ export const RecommendRequestSchema = z.object({
 export type RecommendRequest = z.infer<typeof RecommendRequestSchema>;
 
 /**
- * POST /api/optimize-v7
+ * POST /api/optimize-v7 (intern endpoint, hämtar produkter från DB)
+ * 
+ * OBS: Detta schema skiljer sig från OptimizeV7RequestSchema nedan
+ * som kräver produkter i request body.
+ */
+export const OptimizeV7APIRequestSchema = z.object({
+  targets: z.object({
+    N: z.number().min(0).max(500).optional().default(0),
+    P: z.number().min(0).max(200).optional().default(0),
+    K: z.number().min(0).max(300).optional().default(0),
+    S: z.number().min(0).max(100).optional().default(0),
+  }).refine(
+    (data) => data.N > 0 || data.P > 0 || data.K > 0 || data.S > 0,
+    { message: 'Minst ett mål (N, P, K eller S) måste vara större än 0' }
+  ),
+  mustFlags: z.object({
+    mustN: z.boolean().optional().default(false),
+    mustP: z.boolean().optional().default(false),
+    mustK: z.boolean().optional().default(false),
+    mustS: z.boolean().optional().default(false),
+  }).optional().default({ mustN: false, mustP: false, mustK: false, mustS: false }),
+  maxProducts: z.number().int().min(1).max(4).optional().default(2),
+  minDose: z.number().min(0).max(1000).optional().default(100),
+  maxDose: z.number().min(0).max(1000).optional().default(600),
+}).refine(
+  (data) => data.minDose <= data.maxDose,
+  { message: 'minDose kan inte vara större än maxDose' }
+);
+
+export type OptimizeV7APIRequest = z.infer<typeof OptimizeV7APIRequestSchema>;
+
+/**
+ * POST /api/optimize-v7 (extern variant med produkter i body)
  */
 export const OptimizeV7RequestSchema = z.object({
   need: NutrientNeedSchema,

@@ -43,9 +43,9 @@ export const supabaseAdmin: SupabaseClient = supabaseServiceKey
 
 // Log which client is being used for admin
 if (supabaseServiceKey) {
-  console.log('✅ Admin client configured with service role key');
+  log.startup('Admin client configured with service role key');
 } else {
-  console.warn('⚠️  No SUPABASE_SERVICE_KEY found - admin writes may fail due to RLS');
+  log.warn('No SUPABASE_SERVICE_KEY found - admin writes may fail due to RLS');
 }
 
 // Database table name - matching the Swedish table name in Supabase
@@ -297,7 +297,7 @@ export async function getProductsForRecommendation(
     if (picked.length >= maxCandidates) break;
   }
 
-  console.log(`🎯 Behovsstyrt urval: ${picked.length} kandidater (strategy=${strategy})`);
+  log.debug(`Behovsstyrt urval: ${picked.length} kandidater`, { strategy });
   return picked;
 }
 
@@ -382,7 +382,7 @@ export async function getAllCrops(): Promise<Crop[]> {
       .order('name', { ascending: true });
 
     if (error) {
-      console.error('Error fetching crops from Supabase:', error);
+      log.error('Error fetching crops from Supabase', error);
       return cropsCache ?? []; // Returnera gammal cache om möjligt
     }
 
@@ -393,10 +393,10 @@ export async function getAllCrops(): Promise<Crop[]> {
     cropsCache = data.map(dbCropToCrop);
     cropsCacheTime = now;
     
-    console.log(`🌾 Hämtade ${cropsCache.length} grödor från databasen`);
+    log.db(`Hämtade ${cropsCache.length} grödor från databasen`);
     return cropsCache;
   } catch (error) {
-    console.error('Exception fetching crops:', error);
+    log.error('Exception fetching crops', error);
     return cropsCache ?? [];
   }
 }
@@ -436,13 +436,13 @@ export async function getAllCropsRaw(): Promise<DBCrop[]> {
       .order('name', { ascending: true });
 
     if (error) {
-      console.error('Error fetching crops from Supabase:', error);
+      log.error('Error fetching crops from Supabase', error);
       throw error;
     }
 
     return data || [];
   } catch (error) {
-    console.error('Exception fetching crops:', error);
+    log.error('Exception fetching crops', error);
     throw error;
   }
 }
@@ -459,17 +459,17 @@ export async function createCrop(cropData: Partial<DBCrop>): Promise<DBCrop> {
       .single();
 
     if (error) {
-      console.error('Error creating crop:', error);
+      log.error('Error creating crop', error);
       throw error;
     }
 
     // Invalidera cache
     invalidateCropsCache();
     
-    console.log(`🌾 Skapade gröda: ${cropData.name}`);
+    log.info(`Skapade gröda: ${cropData.name}`);
     return data;
   } catch (error) {
-    console.error('Exception creating crop:', error);
+    log.error('Exception creating crop', error);
     throw error;
   }
 }
@@ -487,17 +487,17 @@ export async function updateCrop(cropId: string, cropData: Partial<DBCrop>): Pro
       .single();
 
     if (error) {
-      console.error('Error updating crop:', error);
+      log.error('Error updating crop', error);
       throw error;
     }
 
     // Invalidera cache
     invalidateCropsCache();
     
-    console.log(`🌾 Uppdaterade gröda: ${cropId}`);
+    log.info(`Uppdaterade gröda: ${cropId}`);
     return data;
   } catch (error) {
-    console.error('Exception updating crop:', error);
+    log.error('Exception updating crop', error);
     throw error;
   }
 }
@@ -513,16 +513,16 @@ export async function deleteCrop(cropId: string): Promise<void> {
       .eq('id', cropId);
 
     if (error) {
-      console.error('Error deleting crop:', error);
+      log.error('Error deleting crop', error);
       throw error;
     }
 
     // Invalidera cache
     invalidateCropsCache();
     
-    console.log(`🌾 Borttagen gröda: ${cropId}`);
+    log.info(`Borttagen gröda: ${cropId}`);
   } catch (error) {
-    console.error('Exception deleting crop:', error);
+    log.error('Exception deleting crop', error);
     throw error;
   }
 }
@@ -575,17 +575,17 @@ export async function getAlgorithmConfig(): Promise<AlgorithmConfigRow[]> {
       .order('key');
 
     if (error) {
-      console.error('Error fetching algorithm config:', error);
+      log.error('Error fetching algorithm config', error);
       throw error;
     }
 
     configCache = data || [];
     configCacheTime = now;
     
-    console.log(`⚙️  Algoritmkonfiguration laddad: ${configCache.length} parametrar`);
+    log.db(`Algoritmkonfiguration laddad: ${configCache.length} parametrar`);
     return configCache;
   } catch (error) {
-    console.error('Exception fetching algorithm config:', error);
+    log.error('Exception fetching algorithm config', error);
     throw error;
   }
 }
@@ -635,16 +635,16 @@ export async function updateAlgorithmConfigValue(key: string, value: number): Pr
       .eq('key', key);
 
     if (error) {
-      console.error('Error updating algorithm config:', error);
+      log.error('Error updating algorithm config', error);
       throw error;
     }
 
     // Invalidera cache
     configCache = null;
     
-    console.log(`⚙️  Algoritmkonfiguration uppdaterad: ${key} = ${value}`);
+    log.info(`Algoritmkonfiguration uppdaterad: ${key} = ${value}`);
   } catch (error) {
-    console.error('Exception updating algorithm config:', error);
+    log.error('Exception updating algorithm config', error);
     throw error;
   }
 }
@@ -670,7 +670,7 @@ export async function deleteLegacyEngineConfig(): Promise<number> {
       .select();
 
     if (error) {
-      console.error('Error deleting legacy engine config:', error);
+      log.error('Error deleting legacy engine config', error);
       throw error;
     }
 
@@ -678,10 +678,10 @@ export async function deleteLegacyEngineConfig(): Promise<number> {
     configCache = null;
     
     const deletedCount = data?.length || 0;
-    console.log(`🗑️  Tog bort ${deletedCount} legacy motorval-konfigurationer`);
+    log.info(`Tog bort ${deletedCount} legacy motorval-konfigurationer`);
     return deletedCount;
   } catch (error) {
-    console.error('Exception deleting legacy config:', error);
+    log.error('Exception deleting legacy config', error);
     throw error;
   }
 }
@@ -705,19 +705,19 @@ export async function updateProductPrice(artikelnr: number, price: number): Prom
       .select();
 
     if (error) {
-      console.error('Error updating product price:', error);
+      log.error('Error updating product price', error);
       throw error;
     }
 
     const updated = data && data.length > 0;
     if (updated) {
-      console.log(`💰 Uppdaterade pris för artikel ${artikelnr}: ${price} kr/kg`);
+      log.info(`Uppdaterade pris för artikel ${artikelnr}: ${price} kr/kg`);
     } else {
-      console.warn(`⚠️  Artikel ${artikelnr} hittades inte`);
+      log.warn(`Artikel ${artikelnr} hittades inte`);
     }
     return updated;
   } catch (error) {
-    console.error('Exception updating product price:', error);
+    log.error('Exception updating product price', error);
     throw error;
   }
 }
@@ -737,19 +737,19 @@ export async function updateProductActiveStatus(artikelnr: number, active: boole
       .select();
 
     if (error) {
-      console.error('Error updating product active status:', error);
+      log.error('Error updating product active status', error);
       throw error;
     }
 
     const updated = data && data.length > 0;
     if (updated) {
-      console.log(`${active ? '✅' : '❌'} Artikel ${artikelnr} markerad som ${active ? 'aktiv' : 'inaktiv'}`);
+      log.info(`Artikel ${artikelnr} markerad som ${active ? 'aktiv' : 'inaktiv'}`);
     } else {
-      console.warn(`⚠️  Artikel ${artikelnr} hittades inte`);
+      log.warn(`Artikel ${artikelnr} hittades inte`);
     }
     return updated;
   } catch (error) {
-    console.error('Exception updating product active status:', error);
+    log.error('Exception updating product active status', error);
     throw error;
   }
 }
@@ -785,7 +785,7 @@ export async function updateProductFromM3(
       .select();
 
     if (error) {
-      console.error('Error updating product from M3:', error);
+      log.error('Error updating product from M3', error);
       throw error;
     }
 
@@ -794,14 +794,14 @@ export async function updateProductFromM3(
       const changes: string[] = [];
       if (updates.price !== undefined) changes.push(`pris=${updates.price}`);
       if (updates.active !== undefined) changes.push(`active=${updates.active}`);
-      console.log(`🔄 M3 uppdatering för artikel ${artikelnr}: ${changes.join(', ')}`);
+      log.info(`M3 uppdatering för artikel ${artikelnr}: ${changes.join(', ')}`);
     } else {
-      console.warn(`⚠️  M3 webhook: Artikel ${artikelnr} hittades inte i FEST-databasen`);
+      log.warn(`M3 webhook: Artikel ${artikelnr} hittades inte i FEST-databasen`);
     }
 
     return { found, updated: found, artikelnr };
   } catch (error) {
-    console.error('Exception in updateProductFromM3:', error);
+    log.error('Exception in updateProductFromM3', error);
     throw error;
   }
 }

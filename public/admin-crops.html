@@ -56,7 +56,7 @@
             </div>
             <div class="header-right">
                 <a href="/" class="btn btn-secondary">🌾 Till FEST</a>
-                <button class="btn btn-primary" onclick="CropsAdmin.openAddModal()">➕ Lägg till gröda</button>
+                <button id="addCropBtn" class="btn btn-primary">➕ Lägg till gröda</button>
             </div>
         </div>
 
@@ -88,7 +88,7 @@
             <!-- Search & Controls -->
             <div class="controls">
                 <div class="search-box">
-                    <input type="text" id="search-input" placeholder="Sök efter gröda..." oninput="CropsAdmin.handleSearch()">
+                    <input type="text" id="search-input" placeholder="Sök efter gröda...">
                 </div>
             </div>
 
@@ -104,10 +104,10 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="modal-title">Lägg till gröda</h2>
-                <button class="btn-close" onclick="CropsAdmin.closeModal()">×</button>
+                <button class="btn-close" id="closeModalBtn">×</button>
             </div>
             <div class="modal-body">
-                <form id="crop-form" onsubmit="CropsAdmin.handleSubmit(event)">
+                <form id="crop-form">
                     <!-- Grundläggande info -->
                     <div class="form-grid">
                         <div class="form-group">
@@ -221,7 +221,7 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="CropsAdmin.closeModal()">Avbryt</button>
+                <button type="button" class="btn btn-secondary" id="cancelModalBtn">Avbryt</button>
                 <button type="submit" form="crop-form" class="btn btn-primary">Spara</button>
             </div>
         </div>

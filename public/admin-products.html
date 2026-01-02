@@ -42,7 +42,7 @@
             </div>
             <div class="header-right">
                 <a href="/" class="btn btn-secondary">🌾 Till FEST</a>
-                <button class="btn btn-primary" onclick="Admin.openAddModal()">➕ Lägg till produkt</button>
+                <button id="addProductBtn" class="btn btn-primary">➕ Lägg till produkt</button>
             </div>
         </div>
 
@@ -59,7 +59,7 @@
             <!-- Search & Controls -->
             <div class="controls">
                 <div class="search-box">
-                    <input type="text" id="search-input" placeholder="Sök efter produktnamn, artikelnr..." onkeyup="Admin.handleSearch()">
+                    <input type="text" id="search-input" placeholder="Sök efter produktnamn, artikelnr...">
                 </div>
             </div>
 
@@ -75,10 +75,10 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="modal-title">Lägg till produkt</h2>
-                <button class="btn-close" onclick="Admin.closeModal()">×</button>
+                <button class="btn-close" id="closeModalBtn">×</button>
             </div>
             <div class="modal-body">
-                <form id="product-form" onsubmit="Admin.handleSubmit(event)">
+                <form id="product-form">
                     <div class="form-grid">
                         <div class="form-group">
                             <label>Artikelnr *</label>
@@ -198,7 +198,7 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="Admin.closeModal()">Avbryt</button>
+                <button type="button" class="btn btn-secondary" id="cancelModalBtn">Avbryt</button>
                 <button type="submit" form="product-form" class="btn btn-primary">Spara</button>
             </div>
         </div>
