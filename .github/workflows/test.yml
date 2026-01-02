@@ -26,6 +26,7 @@ jobs:
       - name: Run unit tests
         env:
           API_KEYS: test-key-for-ci
+          ADMIN_PASSWORD: test-admin-password
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: npm test
@@ -74,6 +75,7 @@ jobs:
       - name: Start server
         env:
           API_KEYS: test-key-for-ci
+          ADMIN_PASSWORD: test-admin-password
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
