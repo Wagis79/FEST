@@ -10,13 +10,14 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import type {
+  OptimizeV7Input} from '../../engine/optimize-v7';
 import { 
   optimizeV7, 
   optimizeV7ToSolutions,
-  OptimizeV7Input,
   DEFAULT_ALGORITHM_CONFIG_V7 
 } from '../../engine/optimize-v7';
-import { Product } from '../../models/Product';
+import type { Product } from '../../models/Product';
 
 // ============================================================================
 // TESTPRODUKTER

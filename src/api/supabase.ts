@@ -4,9 +4,11 @@
  * All rights reserved.
  */
 
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import type { NutrientNeed } from '../models/NutrientNeed';
+import type { Product } from '../models/Product';
 import type { Strategy } from '../engine/scoring';
 import type { Crop, CropUnit } from '../data/crops';
 import log from '../utils/logger';
@@ -82,8 +84,33 @@ function parseNutrient(value: string | undefined): number {
   return isNaN(parsed) ? 0 : parsed;
 }
 
+/**
+ * Produkt för admin-panelen (extended format)
+ */
+export interface AdminProduct {
+  id: string;
+  name: string;
+  pricePerKg: number;
+  N: number;
+  P: number;
+  K: number;
+  S: number;
+  Ca: number;
+  Mg: number;
+  B: number;
+  Cu: number;
+  Mn: number;
+  Zn: number;
+  manufacturer: string;
+  productType: string;
+  notes: string;
+  unit: string;
+  optimizable: boolean;
+  active: boolean;
+}
+
 // Helper to transform DB product to app Product (for recommendation engine)
-export function dbProductToProduct(dbProduct: DBProduct): any {
+export function dbProductToProduct(dbProduct: DBProduct): Product {
   const nutrients = {
     N: parseNutrient(dbProduct.N),
     P: parseNutrient(dbProduct.P),
@@ -103,7 +130,7 @@ export function dbProductToProduct(dbProduct: DBProduct): any {
 }
 
 // Helper to transform DB product to full admin format
-export function dbProductToAdminProduct(dbProduct: DBProduct): any {
+export function dbProductToAdminProduct(dbProduct: DBProduct): AdminProduct {
   return {
     id: `prod-${dbProduct.Artikelnr}`,
     name: dbProduct.Produkt,
@@ -128,7 +155,7 @@ export function dbProductToAdminProduct(dbProduct: DBProduct): any {
 }
 
 // Helper to transform app Product to DB product
-export function productToDBProduct(product: any): Partial<DBProduct> {
+export function productToDBProduct(product: AdminProduct): Partial<DBProduct> {
   const formatNutrient = (val: number) => val === 0 ? '-' : val.toString();
   
   return {
@@ -159,7 +186,7 @@ export function productToDBProduct(product: any): Partial<DBProduct> {
  * Filtrerar bort inaktiva produkter (active = false)
  * Filtrerar bort produkter som inte är optimerbara (isOptimizable = false)
  */
-export async function getAllProductsForRecommendation(): Promise<any[]> {
+export async function getAllProductsForRecommendation(): Promise<Product[]> {
   try {
     const { data, error } = await supabase
       .from(PRODUCTS_TABLE)
@@ -214,7 +241,7 @@ export async function getProductsForRecommendation(
   need: NutrientNeed,
   strategy: Strategy,
   opts: { maxCandidates?: number } = {}
-): Promise<any[]> {
+): Promise<Product[]> {
   const maxCandidates = opts.maxCandidates ?? (strategy === 'optimized' ? 80 : 60);
 
   const all = await getAllProductsForRecommendation();
@@ -227,7 +254,7 @@ export async function getProductsForRecommendation(
 
   // Score: "näringsmängd per krona" för de näringsämnen man faktiskt behöver.
   // Detta är en enkel men effektiv preselection för att få bra träffbild.
-  function productScore(p: any): number {
+  function productScore(p: Product): number {
     const pricePerKg = Number(p.pricePerKg) || 0;
     const safePrice = pricePerKg > 0 ? pricePerKg : 0.000001;
 
@@ -250,7 +277,7 @@ export async function getProductsForRecommendation(
 
   // Diversifiering: se till att vi har med "starka" produkter per ämne också
   // (t.ex. K- eller S-rika) för att undvika att ett ämne får för få kandidater.
-  const byNutrientTop: any[] = [];
+  const byNutrientTop: Product[] = [];
   for (const k of needed) {
     const topForK = [...all]
       .filter((p) => (Number(p.nutrients?.[k]) || 0) > 0)
@@ -260,7 +287,7 @@ export async function getProductsForRecommendation(
   }
 
   // Combine + dedupe by id
-  const picked: any[] = [];
+  const picked: Product[] = [];
   const seen = new Set<string>();
   for (const p of [...byNutrientTop, ...sorted]) {
     if (!p?.id) continue;

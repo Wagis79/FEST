@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-import { NutrientNeed } from './NutrientNeed';
+import type { NutrientNeed } from './NutrientNeed';
 
 /**
  * En produkt med giva i en lösning

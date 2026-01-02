@@ -4,7 +4,8 @@
  * All rights reserved.
  */
 
-import express, { Request, Response, NextFunction } from 'express';
+import type { Request, Response, NextFunction } from 'express';
+import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
@@ -15,9 +16,11 @@ import swaggerUi from 'swagger-ui-express';
 import YAML from 'yaml';
 import log from '../utils/logger';
 import { calculateNutrientNeed, calculateNutrientNeedWithPrecrop, Crop } from '../data/crops';
-import { recommend, RecommendOptions } from '../engine/recommend';
-import { optimizeV7, OptimizeV7Input, OptimizeV7Output } from '../engine/optimize-v7';
-import { NutrientNeed } from '../models/NutrientNeed';
+import type { RecommendOptions } from '../engine/recommend';
+import { recommend } from '../engine/recommend';
+import type { OptimizeV7Input} from '../engine/optimize-v7';
+import { optimizeV7, OptimizeV7Output } from '../engine/optimize-v7';
+import type { NutrientNeed } from '../models/NutrientNeed';
 import { Strategy } from '../engine/scoring';
 import { Product } from '../models/Product';
 import { 

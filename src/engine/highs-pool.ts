@@ -17,10 +17,12 @@
  * - Kö-hantering för concurrent requests
  */
 
-import { spawn, fork, ChildProcess } from 'child_process';
+import type { ChildProcess } from 'child_process';
+import { spawn, fork } from 'child_process';
 import { EventEmitter } from 'events';
 import * as path from 'path';
 import * as readline from 'readline';
+import log from '../utils/logger';
 
 export interface HighsResult {
   status: string;
@@ -117,7 +119,7 @@ class HighsPool extends EventEmitter {
                                 response.message?.includes('Aborted') ||
                                 response.message?.includes('null function');
             if (isWasmError) {
-              console.log(`[pool] WASM error detected, killing worker ${worker.process.pid}`);
+              log.warn(`WASM error detected, killing worker ${worker.process.pid}`);
               worker.process.kill('SIGKILL');
             }
             pending.reject(new Error(response.message || 'Unknown error'));
@@ -126,18 +128,18 @@ class HighsPool extends EventEmitter {
           }
         }
       } catch (e) {
-        console.error('[pool] Failed to parse worker response:', line);
+        log.error('Failed to parse worker response', e as Error, { line });
       }
     });
 
     // Hantera stderr (debug output)
     proc.stderr?.on('data', (data: Buffer) => {
-      console.error(`[worker-${proc.pid}]`, data.toString().trim());
+      log.debug(`[worker-${proc.pid}] ${data.toString().trim()}`);
     });
 
     // Hantera worker-krasch
     proc.on('exit', (code, signal) => {
-      console.error(`[pool] Worker ${proc.pid} exited (code=${code}, signal=${signal})`);
+      log.warn(`Worker ${proc.pid} exited`, { code, signal });
       
       // Reject alla pending requests
       for (const [id, pending] of worker.pendingRequests) {
@@ -158,7 +160,7 @@ class HighsPool extends EventEmitter {
     });
 
     this.workers.push(worker);
-    console.log(`[pool] Spawned worker ${proc.pid} (total: ${this.workers.length})`);
+    log.debug(`Spawned worker ${proc.pid} (total: ${this.workers.length})`);
     
     return worker;
   }
@@ -209,7 +211,7 @@ class HighsPool extends EventEmitter {
         worker.busy = false;
         
         // Döda worker vid timeout
-        console.error(`[pool] Killing worker ${worker.process.pid} due to timeout`);
+        log.warn(`Killing worker ${worker.process.pid} due to timeout`);
         worker.process.kill('SIGKILL');
         
         reject(new Error('Solve timeout'));
@@ -276,7 +278,7 @@ class HighsPool extends EventEmitter {
     );
     
     this.workers = [];
-    console.log('[pool] Shutdown complete');
+    log.info('HiGHS pool shutdown complete');
   }
 
   /**

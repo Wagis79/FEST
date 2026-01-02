@@ -1,6 +1,6 @@
 # FEST – Gödseloptimering med MILP
 
-> **Version:** 2.8.2  
+> **Version:** 2.8.4  
 > **Status:** Produktion med HiGHS-baserad V7-motor
 
 FEST (Fertilizer Expert Sales Tool) är ett beslutsstöd för gödselförsäljare. Systemet beräknar kostnadsoptimala gödselkombinationer utifrån grödans näringsbehov, förfrukt och markkartering.

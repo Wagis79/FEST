@@ -1,6 +1,6 @@
 {
   "name": "fest-nutrient-decision-support",
-  "version": "2.8.1",
+  "version": "2.8.4",
   "description": "Intelligent beslutsstöd för gödselrekommendationer med inköpslista och balanshantering",
   "scripts": {
     "start": "node --max-old-space-size=4096 node_modules/tsx/dist/cli.mjs src/api/start.ts",
@@ -13,7 +13,10 @@
     "test:e2e:ui": "playwright test --ui",
     "test:all": "npm run test && npm run test:e2e",
     "smoke:admin": "tsx src/api/smoke-admin.ts",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "format": "prettier --write src/"
   },
   "keywords": [
     "nutrient",
@@ -26,16 +29,23 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "@eslint/js": "^9.39.2",
     "@playwright/test": "^1.57.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^20.10.5",
     "@types/supertest": "^6.0.3",
     "@types/swagger-ui-express": "^4.1.8",
+    "@typescript-eslint/eslint-plugin": "^8.51.0",
+    "@typescript-eslint/parser": "^8.51.0",
     "@vitest/coverage-v8": "^4.0.16",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.7.4",
     "supertest": "^7.1.4",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3",
+    "typescript-eslint": "^8.51.0",
     "vitest": "^4.0.16"
   },
   "dependencies": {

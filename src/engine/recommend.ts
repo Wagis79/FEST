@@ -4,11 +4,13 @@
  * All rights reserved.
  */
 
-import { Product } from '../models/Product';
-import { NutrientNeed } from '../models/NutrientNeed';
-import { Solution } from '../models/Solution';
-import { Strategy } from './scoring';
-import { optimizeV7ToSolutions, AlgorithmConfigV7 } from './optimize-v7';
+import type { Product } from '../models/Product';
+import type { NutrientNeed } from '../models/NutrientNeed';
+import type { Solution } from '../models/Solution';
+import type { Strategy } from './scoring';
+import type { AlgorithmConfigV7 } from './optimize-v7';
+import { optimizeV7ToSolutions } from './optimize-v7';
+import log from '../utils/logger';
 
 /**
  * Options för rekommendationsmotor
@@ -71,13 +73,13 @@ export async function recommend(
     return hasRelevant;
   });
   
-  console.log(`📊 Filtrerade ${products.length} produkter → ${relevantProducts.length} relevanta`);
+  log.debug(`Filtrerade ${products.length} produkter → ${relevantProducts.length} relevanta`);
   
   const productsToUse = relevantProducts.length >= 5 ? relevantProducts : products;
-  console.log(`🎯 Använder ${productsToUse.length} produkter (maxProducts: ${maxProducts})`);
+  log.debug(`Använder ${productsToUse.length} produkter (maxProducts: ${maxProducts})`);
 
   // Kör V7 MILP-optimering
-  console.log('🚀 Kör OPTIMIZER V7 (HiGHS MILP-solver)');
+  log.optimize('Kör OPTIMIZER V7 (HiGHS MILP-solver)');
   const solutions = await optimizeV7ToSolutions(productsToUse, need, {
     maxProducts,
     requiredNutrients: options.requiredNutrients,
@@ -87,7 +89,7 @@ export async function recommend(
     requiredProductIds: options.requiredProductIds,
   });
   
-  console.log(`✅ V7 returnerade: ${solutions.length} lösningar`);
+  log.optimize(`V7 returnerade: ${solutions.length} lösningar`);
   return solutions.slice(0, topN);
 }
 

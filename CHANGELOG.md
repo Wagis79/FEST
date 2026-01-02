@@ -2,6 +2,42 @@
 
 Alla viktiga ändringar i projektet dokumenteras här.
 
+## [2.8.4] - 2026-01-02
+
+### 🔒 Säkerhet & Kodkvalitet
+
+#### Säkerhetsfix
+- **npm audit fix** - Åtgärdade high severity sårbarhet i `qs` (<6.14.1)
+
+#### Strukturerad loggning (komplett)
+- **Winston logger** ersätter nu alla `console.*` i:
+  - `src/engine/optimize-v7.ts`
+  - `src/engine/highs-pool.ts`
+  - `src/engine/recommend.ts`
+- Konsekvent JSON-format i produktion, färgade loggar i dev
+
+#### ESLint & Prettier
+- **eslint.config.mjs** - Modern flat config med TypeScript-stöd
+- **.prettierrc** - Konsekvent kodformatering
+- **Nya scripts**: `npm run lint`, `npm run lint:fix`, `npm run format`
+- 0 errors, 67 warnings (mestadels `any`-typer att fixa gradvis)
+
+#### Typförbättringar
+- **AdminProduct** interface tillagt i `supabase.ts`
+- **Product** returtyp för `dbProductToProduct()`, `getAllProductsForRecommendation()`
+- Reducerat antal `any`-typer
+
+#### Graceful Shutdown
+- **SIGTERM/SIGINT handlers** i `start.ts`
+- **HiGHS worker pool** stängs av korrekt
+- **uncaughtException** loggas
+
+#### Övriga förbättringar
+- **.env.example** uppdaterad med `API_KEYS` och `M3_WEBHOOK_SECRET`
+- **Version synkroniserad** till 2.8.3 i package.json och README.md
+
+---
+
 ## [2.8.3] - 2026-01-02
 
 ### 📚 Dokumentationsuppdatering

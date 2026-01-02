@@ -41,9 +41,12 @@
  *    - HiGHS körs i separata worker-processer för att isolera WASM-krascher
  */
 
-import { Product } from '../models/Product';
-import { NutrientNeed } from '../models/NutrientNeed';
-import { getHighsPool, HighsResult } from './highs-pool';
+import type { Product } from '../models/Product';
+import type { NutrientNeed } from '../models/NutrientNeed';
+import type { Solution } from '../models/Solution';
+import type { HighsResult } from './highs-pool';
+import { getHighsPool } from './highs-pool';
+import log from '../utils/logger';
 
 // ============================================================================
 // TYPER
@@ -232,7 +235,7 @@ async function solveLPViaPool(lp: string): Promise<HighsResult | null> {
         continue;
       }
       
-      console.error(`[v7] Worker pool error after ${maxRetries} retries:`, e?.message || e);
+      log.error(`Worker pool error after ${maxRetries} retries`, e as Error);
       return null;
     }
   }
@@ -259,7 +262,7 @@ const MAX_SOLVES_BEFORE_RESET = 50;
 async function getHighsSolver(forceNew: boolean = false): Promise<any> {
   if (forceNew || highsSolveCount >= MAX_SOLVES_BEFORE_RESET) {
     if (cachedHighs) {
-      console.log(`[v7] 🔄 Resetting HiGHS (${highsSolveCount} solves, forceNew=${forceNew})`);
+      log.debug(`Resetting HiGHS (${highsSolveCount} solves, forceNew=${forceNew})`);
       cachedHighs = null;
       highsSolveCount = 0;
     }
@@ -270,17 +273,17 @@ async function getHighsSolver(forceNew: boolean = false): Promise<any> {
   }
 
   highsInstanceCounter++;
-  console.log(`[v7] Creating HiGHS instance #${highsInstanceCounter}...`);
+  log.debug(`Creating HiGHS instance #${highsInstanceCounter}...`);
 
   try {
     const highsModule = await import('highs');
     const loader = highsModule.default || highsModule;
     cachedHighs = await loader({});
     highsSolveCount = 0;
-    console.log('[v7] ✅ HiGHS solver ready');
+    log.debug('HiGHS solver ready');
     return cachedHighs;
   } catch (e) {
-    console.error('[v7] Failed to create HiGHS instance:', e);
+    log.error('Failed to create HiGHS instance', e as Error);
     cachedHighs = null;
     throw e;
   }
@@ -291,7 +294,7 @@ function incrementSolveCount(): void {
 }
 
 function resetHighsOnError(): void {
-  console.log('[v7] ⚠️ Forcing HiGHS reset due to error');
+  log.warn('Forcing HiGHS reset due to error');
   cachedHighs = null;
   highsSolveCount = 0;
 }
@@ -616,17 +619,17 @@ async function solveMILP(
                           e?.message?.includes('Aborted');
       
       if (isWasmError && attempt < maxRetries) {
-        console.log(`[v7] HiGHS WASM error, retrying (${attempt + 1}/${maxRetries})...`);
+        log.debug(`HiGHS WASM error, retrying (${attempt + 1}/${maxRetries})...`);
         await new Promise(resolve => setTimeout(resolve, 50));
         continue;
       }
       
-      console.error('[v7] HiGHS solve error:', e);
+      log.error('HiGHS solve error', e as Error);
       return null;
     }
   }
   
-  console.error('[v7] HiGHS failed after', maxRetries, 'attempts:', lastError);
+  log.error(`HiGHS failed after ${maxRetries} attempts`, lastError as Error);
   return null;
 }
 
@@ -785,7 +788,7 @@ async function solveMILPCore(
 
   // Debug-loggning
   if (process.env.DEBUG_LP === '1') {
-    console.log('[v7] LP PROBLEM:\n' + lp.slice(0, 2000) + '...');
+    log.debug('LP PROBLEM:\n' + lp.slice(0, 2000) + '...');
   }
 
   // Lös med HiGHS
@@ -810,20 +813,20 @@ async function solveMILPCore(
   } else {
     // Fallback: direkt HiGHS (kan krascha WASM men snabbare)
     if (shouldUseFallback()) {
-      console.log('[v7] ⚠️ Using inline HiGHS fallback due to pool errors');
+      log.warn('Using inline HiGHS fallback due to pool errors');
     }
     try {
       result = highs.solve(lp);
       incrementSolveCount();
     } catch (wasmError: any) {
-      console.error('[v7] ⚠️ HiGHS WASM error during solve:', wasmError?.message || wasmError);
+      log.error('HiGHS WASM error during solve', wasmError as Error);
       resetHighsOnError();
       throw wasmError; // Låt caller hantera retry
     }
   }
   
   if (result.Status !== 'Optimal') {
-    console.log(`[v7] HiGHS status: ${result.Status}`);
+    log.debug(`HiGHS status: ${result.Status}`);
     return null;
   }
 
@@ -939,7 +942,7 @@ export async function optimizeV7(
   }
   
   // Förbered produkter
-  let preparedProducts = prepareProducts(products);
+  const preparedProducts = prepareProducts(products);
   
   if (preparedProducts.length === 0) {
     return {
@@ -966,7 +969,7 @@ export async function optimizeV7(
       if (idx !== undefined) {
         requiredProductIndices.push(idx);
       } else {
-        console.warn(`[v7] ⚠️ Tvingad produkt ${reqId} hittades inte bland optimerbara produkter`);
+        log.warn(`Tvingad produkt ${reqId} hittades inte bland optimerbara produkter`);
       }
     }
     
@@ -980,7 +983,7 @@ export async function optimizeV7(
       };
     }
     
-    console.log(`[v7] 🔒 Tvingade produkter: ${requiredProductIndices.length} st (${requiredProductIds.join(', ')})`);
+    log.debug(`Tvingade produkter: ${requiredProductIndices.length} st (${requiredProductIds.join(', ')})`);
   }
   
   // Ingen trimning av produktlistan här.
@@ -1008,7 +1011,7 @@ export async function optimizeV7(
                    nutrient === 'P' ? targetP : 
                    nutrient === 'K' ? targetK : targetS;
     
-    console.log(`[v7] Single nutrient mode: ${nutrient} = ${target} kg/ha`);
+    log.debug(`Single nutrient mode: ${nutrient} = ${target} kg/ha`);
     
     const singleSolutions = solveSingleNutrient(
       preparedProducts,
@@ -1048,7 +1051,7 @@ export async function optimizeV7(
         nToleranceUsed: nutrient === 'N' ? config.N_TOLERANCE_KG : null,
       }));
 
-      console.log(`[v7] ✅ Single nutrient: ${strategies.length} strategier, tid: ${Date.now() - startTime}ms`);
+      log.optimize(`Single nutrient: ${strategies.length} strategier, tid: ${Date.now() - startTime}ms`);
 
       return {
         status: 'ok',
@@ -1059,14 +1062,14 @@ export async function optimizeV7(
     }
 
     // Fallback till MILP om ingen single-produkt funkar
-    console.log('[v7] Single nutrient fallback till MILP');
+    log.debug('Single nutrient fallback till MILP');
   }
 
   // ──────────────────────────────────────────────────────────────────────────
   // MILP MODE (activeCount >= 2 eller single-nutrient fallback)
   // ──────────────────────────────────────────────────────────────────────────
   
-  console.log(`[v7] MILP mode: ${activeNutrients.join(', ')}`);
+  log.debug(`MILP mode: ${activeNutrients.join(', ')}`);
   
   // Söklogik: prova maxProductsUser, autoöka till effectiveHardCap
   // Om mustN=true: eskalera N-tolerans vid behov
@@ -1092,7 +1095,7 @@ export async function optimizeV7(
     
     // Timeout-check
     if (Date.now() - startTime > config.TIMEOUT_MS) {
-      console.log('[v7] ⚠️ Timeout nådd');
+      log.warn('Timeout nådd');
       break;
     }
     
@@ -1123,24 +1126,24 @@ export async function optimizeV7(
         } catch (wasmError: any) {
           retryCount++;
           if (retryCount <= maxRetries) {
-            console.log(`[v7] 🔄 WASM error, retry ${retryCount}/${maxRetries} with fresh HiGHS instance...`);
+            log.debug(`WASM error, retry ${retryCount}/${maxRetries} with fresh HiGHS instance...`);
             // getHighsSolver returnerar ny instans efter resetHighsOnError()
             highs = await getHighsSolver(true);
           } else {
-            console.error('[v7] ❌ Max retries reached, giving up on this solve');
+            log.error('Max retries reached, giving up on this solve');
             solution = null;
           }
         }
       }
 
       if (solution) {
-        console.log(`[v7] ✅ Lösning hittad: maxProducts=${mp}, nTolerance=${nTol}`);
+        log.optimize(`Lösning hittad: maxProducts=${mp}, nTolerance=${nTol}`);
         break outerLoop;
       }
     }
     
     if (mustFlags.mustN) {
-      console.log(`[v7] Ingen lösning med N-tolerans +${nTol}, provar +${nTol + 1}...`);
+      log.debug(`Ingen lösning med N-tolerans +${nTol}, provar +${nTol + 1}...`);
     }
   }
 
@@ -1177,7 +1180,7 @@ export async function optimizeV7(
         );
       } catch (e) {
         if (retry === 0) {
-          console.log('[v7] 🔄 WASM error in strategy solve, retrying...');
+          log.debug('WASM error in strategy solve, retrying...');
           highs = await getHighsSolver(true);
         }
       }
@@ -1208,7 +1211,7 @@ export async function optimizeV7(
   // FALLBACK: Generera syntetiska alternativ om vi inte har tillräckligt
   // ──────────────────────────────────────────────────────────────────────────
   if (strategies.length < numStrategies && strategies.length > 0) {
-    console.log(`[v7] ⚠️ Endast ${strategies.length}/${numStrategies} strategier, genererar fallback-alternativ...`);
+    log.debug(`Endast ${strategies.length}/${numStrategies} strategier, genererar fallback-alternativ...`);
     
     // Basera fallback på första strategin men med dosvariation
     const baseStrategy = strategies[0];
@@ -1276,7 +1279,7 @@ export async function optimizeV7(
         };
         
         strategies.push(fallbackStrategy);
-        console.log(`[v7] ✅ Fallback-strategi ${strategies.length} genererad (${variation > 1 ? '+' : ''}${Math.round((variation - 1) * 100)}% dos)`);
+        log.debug(`Fallback-strategi ${strategies.length} genererad (${variation > 1 ? '+' : ''}${Math.round((variation - 1) * 100)}% dos)`);
       }
     }
   }
@@ -1300,7 +1303,7 @@ export async function optimizeV7(
   // Uppdatera rank efter sortering
   strategies.forEach((s, i) => s.rank = i + 1);
 
-  console.log(`[v7] ✅ Klar: ${strategies.length} strategier, tid: ${Date.now() - startTime}ms`);
+  log.optimize(`Klar: ${strategies.length} strategier, tid: ${Date.now() - startTime}ms`);
 
   return {
     status: 'ok',
@@ -1375,7 +1378,7 @@ export async function optimizeV7ToSolutions(
     config?: AlgorithmConfigV7;
     requiredProductIds?: string[];
   } = {}
-): Promise<import('../models/Solution').Solution[]> {
+): Promise<Solution[]> {
   
   const requiredNutrients = options.requiredNutrients || [];
   
