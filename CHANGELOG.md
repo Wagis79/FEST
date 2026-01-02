@@ -2,6 +2,30 @@
 
 Alla viktiga ändringar i projektet dokumenteras här.
 
+## [2.8.2] - 2026-01-02
+
+### 🛡️ Frontend Error Handler
+
+#### Centraliserad felhantering
+- **ErrorHandler** - Global felhantering för frontend
+  - `public/js/error-handler.js` - Ny modul för felhantering
+  - `window.onerror` och `unhandledrejection` fångas automatiskt
+  - Användarvänliga felmeddelanden på svenska
+  - Support för Zod-valideringsfel med `details`-array
+
+#### Funktioner
+- `ErrorHandler.handleError(error, context)` - Huvudmetod för felhantering
+- `ErrorHandler.withErrorHandling(apiCall, options)` - Wrapper för API-anrop
+- `ErrorHandler.showWarning(message)` - Visa varningar
+- `ErrorHandler.showApiWarnings(response)` - Visa API-varningar
+
+#### API.js förbättrad
+- Alla API-metoder använder nu `ErrorHandler.withErrorHandling()`
+- Automatisk visning av API-varningar (t.ex. högt näringsbehov)
+- Fallback-värden vid fel (tom array för grödor/produkter)
+
+---
+
 ## [2.8.1] - 2026-01-02
 
 ### ✅ Zod Input-validering

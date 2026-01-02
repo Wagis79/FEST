@@ -4,7 +4,7 @@
  * All rights reserved.
  * 
  * API Communication
- * Alla API-anrop till backend
+ * Alla API-anrop till backend med centraliserad felhantering
  */
 
 const API = {
@@ -12,71 +12,63 @@ const API = {
      * Hämta alla grödor
      */
     async fetchCrops() {
-        try {
+        return ErrorHandler.withErrorHandling(async () => {
             const response = await fetch('/api/crops');
             const data = await response.json();
             if (data.success) {
                 AppState.crops = data.crops;
                 return data.crops;
             }
-            throw new Error(data.error || 'Kunde inte hämta grödor');
-        } catch (error) {
-            console.error('Fel vid hämtning av grödor:', error);
-            throw error;
-        }
+            throw { ...data, status: response.status };
+        }, {
+            fallback: [],
+            onError: (err) => console.error('Fel vid hämtning av grödor:', err)
+        });
     },
 
     /**
      * Hämta alla produkter
      */
     async fetchProducts() {
-        try {
+        return ErrorHandler.withErrorHandling(async () => {
             const response = await fetch('/api/products');
             const data = await response.json();
             if (data.success) {
                 AppState.products = data.products;
                 return data.products;
             }
-            throw new Error(data.error || 'Kunde inte hämta produkter');
-        } catch (error) {
-            console.error('Fel vid hämtning av produkter:', error);
-            throw error;
-        }
+            throw { ...data, status: response.status };
+        }, {
+            fallback: [],
+            onError: (err) => console.error('Fel vid hämtning av produkter:', err)
+        });
     },
 
     /**
      * Beräkna näringsbehov från gröda
      */
     async calculateNeed(cropId, yieldTonPerHa) {
-        try {
+        return ErrorHandler.withErrorHandling(async () => {
             const response = await fetch('/api/calculate-need', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ cropId, yieldTonPerHa })
             });
-            const data = await response.json();
-            return data; // Returnera hela svaret, inte bara data.need
-        } catch (error) {
-            console.error('Fel vid beräkning av näringsbehov:', error);
-            throw error;
-        }
+            return await response.json();
+        });
     },
 
     /**
      * Hämta gödselrekommendationer
      */
     async getRecommendations(need, strategy, maxProducts, topN, requiredNutrients) {
-        try {
+        return ErrorHandler.withErrorHandling(async () => {
             // Inkludera exkluderade och tvingade produkter om det finns några
             const excludedProductIds = AppState.excludedProductIds || [];
             const requiredProductIds = AppState.requiredProductIds || [];
             
-            console.log('[API] ============================================');
             console.log('[API] getRecommendations() anropad');
-            console.log('[API] AppState.excludedProductIds:', AppState.excludedProductIds);
-            console.log('[API] AppState.requiredProductIds:', AppState.requiredProductIds);
-            console.log('[API] Antal exkluderade:', excludedProductIds.length);
-            console.log('[API] Antal tvingade:', requiredProductIds.length);
+            console.log('[API] Exkluderade:', excludedProductIds.length, 'Tvingade:', requiredProductIds.length);
             
             const requestBody = { 
                 need, 
@@ -88,32 +80,24 @@ const API = {
                 requiredProductIds: requiredProductIds.length > 0 ? requiredProductIds : undefined
             };
             
-            console.log('[API] Request body:', JSON.stringify(requestBody, null, 2));
-            console.log('[API] ============================================');
-            
             const response = await fetch('/api/recommend', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(requestBody)
             });
-            const data = await response.json();
-            console.log('[API] Svar från /api/recommend:', data);
             
-            // Logga antal produkter per lösning
-            if (data.solutions) {
-                console.log('[API] Produkter per lösning:', data.solutions.map((s, i) => 
-                    `Lösning ${i+1}: ${s.products.length} produkter`
-                ).join(', '));
+            const data = await response.json();
+            
+            // Visa varningar om det finns några
+            if (data.warnings) {
+                ErrorHandler.showApiWarnings(data);
             }
             
             if (data.success) {
                 return data;
             }
-            throw new Error(data.error || 'Kunde inte hämta rekommendationer');
-        } catch (error) {
-            console.error('Fel vid hämtning av rekommendationer:', error);
-            throw error;
-        }
+            throw { ...data, status: response.status };
+        });
     }
 };
 
