@@ -13,10 +13,33 @@ info:
     ## Autentisering
     Alla API-endpoints kräver en giltig API-nyckel som skickas i headern `X-API-Key`.
     
+    ## Rate Limiting
+    API:et har följande begränsningar:
+    - **Generell API:** 100 requests / 15 min per IP
+    - **Optimering** (`/api/recommend`): 10 requests / min per IP
+    - **Admin** (`/api/admin/*`): 30 requests / 15 min per IP
+    
+    Rate limit-headers inkluderas i alla svar:
+    - `RateLimit-Limit`: Max antal requests
+    - `RateLimit-Remaining`: Återstående requests
+    - `RateLimit-Reset`: Tidpunkt för reset
+    
+    ## Validering
+    Alla requests valideras med Zod-scheman. Vid valideringsfel returneras:
+    ```json
+    {
+      "success": false,
+      "error": "Valideringsfel",
+      "details": [
+        { "field": "need.N", "message": "Number must be at most 500", "code": "too_big" }
+      ]
+    }
+    ```
+    
     ## Begränsningar
     - Endast läsoperationer och beräkningar är tillgängliga
     - Inga skriv- eller ändringsoperationer
-  version: 1.0.0
+  version: 2.8.2
   contact:
     name: FEST API Support
   license:
@@ -319,6 +342,41 @@ components:
         need:
           $ref: '#/components/schemas/NutrientNeed'
 
+    ValidationError:
+      type: object
+      description: Zod-valideringsfel med detaljerad information
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          example: "Valideringsfel"
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+                description: Fältets sökväg (t.ex. "need.N")
+              message:
+                type: string
+                description: Felbeskrivning
+              code:
+                type: string
+                description: Zod-felkod (t.ex. "too_big", "invalid_type")
+
+    RateLimitError:
+      type: object
+      description: Rate limit överskriden
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          example: "För många förfrågningar. Försök igen om 60 sekunder."
     ProductsResponse:
       type: object
       properties:

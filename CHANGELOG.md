@@ -2,6 +2,34 @@
 
 Alla viktiga ändringar i projektet dokumenteras här.
 
+## [2.8.3] - 2026-01-02
+
+### 📚 Dokumentationsuppdatering
+
+#### OpenAPI (openapi.yaml)
+- **Version uppdaterad** till 2.8.2
+- **Rate Limiting** dokumenterat med alla gränser
+- **Zod-validering** beskriven med exempel på felformat
+- **ValidationError** och **RateLimitError** scheman tillagda
+- **Näringsgränser** dokumenterade (N max 500, P max 200, etc.)
+
+#### README.md
+- **Nya funktioner v2.8** sektion tillagd
+- **Filstruktur** uppdaterad med nya filer (validation.ts, logger.ts, error-handler.js)
+- **Testning** sektion utökad med Playwright E2E-tester
+- **Scripts** uppdaterade med test:e2e, test:e2e:ui, test:all
+
+#### API_DOCUMENTATION.md
+- **Version uppdaterad** till 2.8.2
+- **Rate Limiting** sektion tillagd med headers och exempel
+- **Validering & Felhantering** sektion tillagd
+  - Zod-valideringsformat dokumenterat
+  - Valideringsgränser tabell
+  - Varningar förklarade
+  - Felkoder tabell
+
+---
+
 ## [2.8.2] - 2026-01-02
 
 ### 🛡️ Frontend Error Handler

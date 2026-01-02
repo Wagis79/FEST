@@ -1,6 +1,6 @@
 # FEST API Documentation
 
-**Version:** 1.0  
+**Version:** 2.8.2  
 **Produktion:** `https://fest-production-d1bb.up.railway.app`  
 **Lokal utveckling:** `http://localhost:3000`  
 **Content-Type:** `application/json`
@@ -17,6 +17,40 @@ FEST API är ett REST API för optimering av gödselblandningar. API:et tar emot
 - 💰 **Kostnadsminimering** - Hittar den billigaste produktkombinationen som täcker behoven
 - 🌾 **Grödobaserad beräkning** - Beräkna näringsbehov från gröda och förväntad skörd
 - 📊 **Flera lösningar** - Returnerar flera alternativa lösningar för jämförelse
+
+### Nya funktioner v2.8
+
+- 🔒 **Rate Limiting** - Skydd mot överbelastning (100 req/15 min, optimering 10 req/min)
+- ✅ **Zod-validering** - Typsäker validering med detaljerade felmeddelanden
+- 📊 **Strukturerad loggning** - Winston-baserad loggning
+- ⚠️ **Varningar** - API:et returnerar varningar för potentiellt problematisk input
+
+---
+
+## Rate Limiting
+
+API:et har följande begränsningar:
+
+| Endpoint | Gräns | Period |
+|----------|-------|--------|
+| Generell API | 100 requests | 15 minuter |
+| Optimering (`/api/recommend`) | 10 requests | 1 minut |
+| Admin (`/api/admin/*`) | 30 requests | 15 minuter |
+
+**Rate limit-headers i svar:**
+```
+RateLimit-Limit: 100
+RateLimit-Remaining: 95
+RateLimit-Reset: 1704196800
+```
+
+**Vid överskriden gräns (429):**
+```json
+{
+  "success": false,
+  "error": "För många förfrågningar. Försök igen om 60 sekunder."
+}
+```
 
 ---
 
@@ -90,6 +124,70 @@ https://your-server.com/api-docs
 ```
 
 OpenAPI-specifikation (YAML) för automatisk klientgenerering finns i projektets rot som `openapi.yaml`.
+
+---
+
+## Validering & Felhantering
+
+### Zod-validering
+
+Alla API-requests valideras med Zod-scheman. Vid valideringsfel returneras HTTP 400 med detaljerad felinformation:
+
+```json
+{
+  "success": false,
+  "error": "Valideringsfel",
+  "details": [
+    {
+      "field": "need.N",
+      "message": "Number must be at most 500",
+      "code": "too_big"
+    },
+    {
+      "field": "strategy",
+      "message": "Invalid enum value. Expected 'economic' | 'optimized'",
+      "code": "invalid_enum_value"
+    }
+  ]
+}
+```
+
+### Valideringsgränser
+
+| Fält | Min | Max | Beskrivning |
+|------|-----|-----|-------------|
+| `need.N` | 0 | 500 | Kvävebehov (kg/ha) |
+| `need.P` | 0 | 200 | Fosforbehov (kg/ha) |
+| `need.K` | 0 | 300 | Kaliumbehov (kg/ha) |
+| `need.S` | 0 | 100 | Svavelbehov (kg/ha) |
+| `maxProducts` | 1 | 5 | Max antal produkter |
+| `topN` | 1 | 50 | Max antal lösningar |
+
+### Varningar
+
+API:et returnerar varningar för potentiellt problematisk input (utan att avbryta requesten):
+
+```json
+{
+  "success": true,
+  "warnings": [
+    "Högt N-behov (450 kg/ha). Risk för längre beräkningstid.",
+    "Alla produktslots är tvingade (3/3). Optimeraren har ingen flexibilitet."
+  ],
+  "solutions": [...]
+}
+```
+
+### Felkoder
+
+| HTTP | Kod | Beskrivning |
+|------|-----|-------------|
+| 400 | `Valideringsfel` | Zod-validering misslyckades |
+| 401 | `MISSING_API_KEY` | API-nyckel saknas |
+| 403 | `INVALID_API_KEY` | Ogiltig API-nyckel |
+| 403 | `ENDPOINT_NOT_AVAILABLE` | Endpoint ej tillgänglig externt |
+| 429 | - | Rate limit överskriden |
+| 500 | - | Internt serverfel |
 
 ---
 

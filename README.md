@@ -1,5 +1,6 @@
 # FEST – Gödseloptimering med MILP
 
+> **Version:** 2.8.2  
 > **Status:** Produktion med HiGHS-baserad V7-motor
 
 FEST (Fertilizer Expert Sales Tool) är ett beslutsstöd för gödselförsäljare. Systemet beräknar kostnadsoptimala gödselkombinationer utifrån grödans näringsbehov, förfrukt och markkartering.
@@ -9,13 +10,15 @@ FEST (Fertilizer Expert Sales Tool) är ett beslutsstöd för gödselförsäljar
 ## Innehåll
 
 1. [Snabbstart](#snabbstart)
-2. [Arkitektur](#arkitektur)
-3. [API-referens](#api-referens)
-4. [Optimeringsmotorer](#optimeringsmotorer)
-5. [Frontend](#frontend)
-6. [Databas](#databas)
-7. [Konfiguration](#konfiguration)
-8. [Utveckling](#utveckling)
+2. [Nya funktioner v2.8](#nya-funktioner-v28)
+3. [Arkitektur](#arkitektur)
+4. [API-referens](#api-referens)
+5. [Optimeringsmotorer](#optimeringsmotorer)
+6. [Frontend](#frontend)
+7. [Databas](#databas)
+8. [Konfiguration](#konfiguration)
+9. [Utveckling](#utveckling)
+10. [Testning](#testning)
 
 ---
 
@@ -51,6 +54,39 @@ API_KEYS=nyckel1,nyckel2,nyckel3
 # M3 ERP-integration
 M3_WEBHOOK_SECRET=hemlig-webhook-nyckel
 ```
+
+---
+
+## Nya funktioner v2.8
+
+### 🔒 Säkerhet (v2.7.3)
+- **Rate Limiting** - Skydd mot överbelastning
+  - Generell API: 100 req/15 min
+  - Optimering: 10 req/min
+  - Admin: 30 req/15 min
+- **Helmet** - Automatiska säkerhetsheaders (CSP, HSTS, etc.)
+
+### 📊 Strukturerad loggning (v2.8.0)
+- **Winston Logger** - Ersatt console.log med strukturerad loggning
+  - Färgkodade loggar i dev, JSON i produktion
+  - Domänspecifika metoder: `log.request()`, `log.optimize()`, `log.db()`
+
+### ✅ Zod-validering (v2.8.1)
+- **Typsäker API-validering** - Deklarativa scheman för alla endpoints
+  - Automatisk TypeScript-typning
+  - Konsistenta felmeddelanden med `details`-array
+  - Max-/min-gränser valideras
+
+### 🛡️ Frontend Error Handler (v2.8.2)
+- **ErrorHandler** - Global felhantering för frontend
+  - Fångar `window.onerror` och `unhandledrejection`
+  - Användarvänliga felmeddelanden
+  - `ErrorHandler.withErrorHandling()` wrapper
+
+### 🧪 Testning (v2.8.0)
+- **Playwright E2E** - 12 end-to-end-tester
+- **Vitest** - 38 unit/integration-tester
+- **GitHub Actions CI** - Automatiserad testkörning
 
 ---
 
@@ -161,7 +197,8 @@ src/
 ├── api/
 │   ├── server.ts       # Express-server, alla endpoints
 │   ├── start.ts        # Serverstart
-│   └── supabase.ts     # Supabase-klient
+│   ├── supabase.ts     # Supabase-klient
+│   └── validation.ts   # Zod-scheman för API-validering ✨ NY
 ├── engine/
 │   ├── recommend.ts    # Rekommendations-orchestrator
 │   ├── optimize-v7.ts  # HiGHS MILP (produktion)
@@ -169,9 +206,11 @@ src/
 │   ├── highs-worker.ts # Worker thread för HiGHS
 │   └── scoring.ts      # Lösningsutvärdering
 ├── models/
-│   ├── Product.ts      # Produkttyper
+│   ├── Product.ts      # Produkttyper (inkl. isOptimizable, active)
 │   ├── Solution.ts     # Lösningstyper
 │   └── NutrientNeed.ts # Näringsbehovstyper
+├── utils/
+│   └── logger.ts       # Winston strukturerad loggning ✨ NY
 └── data/
     └── crops.ts        # Fallback-gröddata
 
@@ -183,6 +222,7 @@ public/
 └── js/
     ├── app.js          # Applikationsstart
     ├── api.js          # API-kommunikation
+    ├── error-handler.js # Global felhantering ✨ NY
     ├── state.js        # Global state
     ├── forms.js        # Formulärhantering
     ├── balance.js      # Näringsberäkningar
@@ -190,6 +230,12 @@ public/
     ├── storage.js      # localStorage
     ├── tabs.js         # Fliknavigering
     └── utils.js        # Hjälpfunktioner
+
+e2e/                    # Playwright E2E-tester ✨ NY
+├── basic.spec.ts       # 8 grundläggande tester
+└── optimization-flow.spec.ts # 4 UI-flödestester
+
+playwright.config.ts    # Playwright-konfiguration ✨ NY
 ```
 
 ---
@@ -436,23 +482,34 @@ Administreras via `/admin-config.html` eller direkt i Supabase.
 npm run server    # Starta utvecklingsserver med tsx
 npm run build     # Kompilera TypeScript till dist/
 npm run check     # Typkontroll utan kompilering
-npm test          # Kör alla tester
+npm test          # Kör alla unit-tester
 npm run test:watch    # Kör tester i watch-läge
 npm run test:coverage # Kör tester med täckningsrapport
+npm run test:e2e      # Kör Playwright E2E-tester
+npm run test:e2e:ui   # Playwright interaktiv testmiljö
+npm run test:all      # Kör både unit- och E2E-tester
 ```
+
+---
+
+## Testning
 
 ### Testramverk
 
-Projektet använder **Vitest** för enhetstester och integrationstester.
+Projektet använder:
+- **Vitest** för unit- och integrationstester (38 tester)
+- **Playwright** för end-to-end-tester (12 tester)
+
+### Unit/Integration-tester (Vitest)
 
 ```bash
 # Kör alla tester
 npm test
 
-# Kör tester i watch-läge under utveckling
+# Watch-läge
 npm run test:watch
 
-# Generera täckningsrapport
+# Täckningsrapport
 npm run test:coverage
 ```
 
@@ -461,22 +518,52 @@ npm run test:coverage
 ```
 src/__tests__/
 ├── engine/
-│   └── optimize-v7.test.ts   # MILP-motor tester (12 tester)
+│   └── optimize-v7.test.ts   # MILP-motor (12 tester)
 └── api/
-    └── server.test.ts        # API integrationstester (26 tester)
+    └── server.test.ts        # API integration (26 tester)
+```
+
+### E2E-tester (Playwright)
+
+```bash
+# Kör E2E-tester (startar server automatiskt)
+npm run test:e2e
+
+# Interaktiv testmiljö
+npm run test:e2e:ui
+
+# Med specifik browser
+npx playwright test --project=chromium
+```
+
+#### E2E Teststruktur
+
+```
+e2e/
+├── basic.spec.ts              # Startsida, API-endpoints, admin (8 tester)
+└── optimization-flow.spec.ts  # UI-flöde, resultat (4 tester)
 ```
 
 #### Vad testas
 
-- **Optimeringsmotor (V7):** Multi-näringslösning, enskilda näringsämnen, N-toleranseskalering, PKS-krav, kantfall
-- **API-endpoints:** Validering, autentisering, /health, /api/crops, /api/recommend, /api/calculate-need
-- **M3 Webhook:** Autentisering, validering, prisuppdatering, active-status
+**Unit/Integration:**
+- **Optimeringsmotor (V7):** Multi-näringslösning, N-toleranseskalering, PKS-krav, kantfall
+- **API-endpoints:** Zod-validering, autentisering, /health, /api/crops, /api/recommend
+- **M3 Webhook:** Autentisering, validering, prisuppdatering
 
-#### CI/CD
+**E2E:**
+- **Startsida:** Laddning, formulär för näringsbehov
+- **API:** Health, crops, recommend (med/utan API-nyckel)
+- **Admin:** Autentiseringskrav
+- **UI-flöde:** Flikar, beräkna-knapp, resultatvisning
+
+### CI/CD
 
 Testerna körs automatiskt via GitHub Actions vid varje push till `main` och vid pull requests.
 
 Se status: https://github.com/Wagis79/FEST/actions
+
+---
 
 ### Teknisk stack
 
