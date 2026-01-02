@@ -17,7 +17,7 @@ import app from '../../api/server';
 
 // Hämta en API-nyckel från miljön för tester
 const API_KEY = process.env.API_KEYS?.split(',')[0]?.trim() || 'test-key';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'test-admin-password';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'FESTadmin2025';
 
 // Helper för att lägga till API-nyckel
 function withApiKey(req: request.Test): request.Test {
