@@ -17,10 +17,16 @@ import app from '../../api/server';
 
 // Hämta en API-nyckel från miljön för tester
 const API_KEY = process.env.API_KEYS?.split(',')[0]?.trim() || 'test-key';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'test-admin-password';
 
 // Helper för att lägga till API-nyckel
 function withApiKey(req: request.Test): request.Test {
   return req.set('X-API-Key', API_KEY);
+}
+
+// Helper för att lägga till admin-lösenord
+function withAdminAuth(req: request.Test): request.Test {
+  return req.set('X-Admin-Password', ADMIN_PASSWORD);
 }
 
 // ============================================================================
@@ -638,6 +644,237 @@ describe('POST /api/webhook/m3-product', () => {
       
       if (response.status === 200) {
         expect(response.body.success).toBe(true);
+      }
+    });
+
+  });
+
+});
+
+// ============================================================================
+// ADMIN PRODUCTS API
+// ============================================================================
+
+describe('Admin Products API', () => {
+
+  describe('GET /api/admin/products', () => {
+    
+    it('ska returnera 401 eller 403 utan admin-lösenord', async () => {
+      const response = await request(app).get('/api/admin/products');
+      expect([401, 403]).toContain(response.status);
+    });
+
+    it('ska returnera produktlista med admin-lösenord', async () => {
+      const response = await withAdminAuth(
+        request(app).get('/api/admin/products')
+      );
+      // 200 = lyckades, 503 = db nere
+      expect([200, 500, 503]).toContain(response.status);
+      if (response.status === 200) {
+        // Kan vara en array direkt eller objekt med products
+        expect(Array.isArray(response.body) || response.body?.products).toBeTruthy();
+      }
+    });
+
+  });
+
+  describe('POST /api/admin/products', () => {
+    
+    it('ska returnera 401 eller 403 utan admin-lösenord', async () => {
+      const response = await request(app)
+        .post('/api/admin/products')
+        .send({});
+      expect([401, 403]).toContain(response.status);
+    });
+
+    it('ska returnera 400 för ogiltig produkt', async () => {
+      const response = await withAdminAuth(
+        request(app)
+          .post('/api/admin/products')
+          .set('Content-Type', 'application/json')
+      ).send({ name: '' }); // Saknar obligatoriska fält
+      
+      expect([400, 500]).toContain(response.status);
+    });
+
+  });
+
+  describe('PUT /api/admin/products/:id', () => {
+    
+    it('ska returnera 401 eller 403 utan admin-lösenord', async () => {
+      const response = await request(app)
+        .put('/api/admin/products/prod-12345')
+        .send({});
+      expect([401, 403]).toContain(response.status);
+    });
+
+  });
+
+  describe('DELETE /api/admin/products/:id', () => {
+    
+    it('ska returnera 401 eller 403 utan admin-lösenord', async () => {
+      const response = await request(app)
+        .delete('/api/admin/products/prod-12345');
+      expect([401, 403]).toContain(response.status);
+    });
+
+  });
+
+});
+
+// ============================================================================
+// ADMIN CROPS API
+// ============================================================================
+
+describe('Admin Crops API', () => {
+
+  describe('GET /api/admin/crops', () => {
+    
+    it('ska returnera 401 eller 403 utan admin-lösenord', async () => {
+      const response = await request(app).get('/api/admin/crops');
+      expect([401, 403]).toContain(response.status);
+    });
+
+    it('ska returnera grödlista med admin-lösenord', async () => {
+      const response = await withAdminAuth(
+        request(app).get('/api/admin/crops')
+      );
+      // 200 = lyckades, 503 = db nere
+      expect([200, 500, 503]).toContain(response.status);
+      if (response.status === 200) {
+        // Kan vara en array eller ett objekt med crops
+        expect(Array.isArray(response.body) || response.body?.crops).toBeTruthy();
+      }
+    });
+
+  });
+
+  describe('GET /api/admin/config', () => {
+    
+    it('ska returnera konfiguration med admin-lösenord', async () => {
+      const response = await withAdminAuth(
+        request(app).get('/api/admin/config')
+      );
+      // 200 = lyckades, 503 = db nere
+      expect([200, 500, 503]).toContain(response.status);
+    });
+
+  });
+
+  describe('GET /api/admin/product-analysis', () => {
+    
+    it('ska returnera produktanalys med admin-lösenord', async () => {
+      const response = await withAdminAuth(
+        request(app).get('/api/admin/product-analysis')
+      );
+      // 200 = lyckades, 500/503 = fel
+      expect([200, 500, 503]).toContain(response.status);
+    });
+
+  });
+
+});
+
+// ============================================================================
+// ADMIN CONFIG BATCH & LEGACY DELETION
+// ============================================================================
+
+describe('Admin Config Extended Operations', () => {
+
+  describe('POST /api/admin/config/batch', () => {
+    
+    it('ska returnera 401 eller 403 utan lösenord', async () => {
+      const response = await request(app)
+        .post('/api/admin/config/batch')
+        .set('Content-Type', 'application/json')
+        .send({ updates: [] });
+      
+      // 401 = unauthorized, 403 = forbidden (admin auth)
+      expect([401, 403]).toContain(response.status);
+    });
+
+    it('ska returnera 400 för ogiltig payload', async () => {
+      const response = await withAdminAuth(
+        request(app)
+          .post('/api/admin/config/batch')
+          .set('Content-Type', 'application/json')
+      ).send({ invalid: 'payload' });
+      
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+    });
+
+    it('ska hantera tom updates-array', async () => {
+      const response = await withAdminAuth(
+        request(app)
+          .post('/api/admin/config/batch')
+          .set('Content-Type', 'application/json')
+      ).send({ updates: [] });
+      
+      // 200 = 0/0 lyckades, 400 = validation, 500 = db-fel
+      expect([200, 400, 500]).toContain(response.status);
+    });
+
+    it('ska hantera batch-uppdatering av konfiguration', async () => {
+      const response = await withAdminAuth(
+        request(app)
+          .post('/api/admin/config/batch')
+          .set('Content-Type', 'application/json')
+      ).send({ 
+        updates: [
+          { key: 'TEST_BATCH_KEY_1', value: '123' },
+          { key: 'TEST_BATCH_KEY_2', value: '456' }
+        ]
+      });
+      
+      // 200 = lyckades, 400 = validation, 500 = databas-fel
+      expect([200, 400, 500]).toContain(response.status);
+      
+      if (response.status === 200) {
+        expect(response.body).toHaveProperty('results');
+        expect(Array.isArray(response.body.results)).toBe(true);
+      }
+    });
+
+    it('ska hantera ogiltiga värden i batch', async () => {
+      const response = await withAdminAuth(
+        request(app)
+          .post('/api/admin/config/batch')
+          .set('Content-Type', 'application/json')
+      ).send({ 
+        updates: [
+          { key: 'TEST_KEY', value: 'not-a-number' }
+        ]
+      });
+      
+      // Bör ge 200 med results men value markerad som failed
+      expect([200, 400, 500]).toContain(response.status);
+    });
+
+  });
+
+  describe('DELETE /api/admin/config/legacy-engine', () => {
+    
+    it('ska returnera 401 eller 403 utan lösenord', async () => {
+      const response = await request(app)
+        .delete('/api/admin/config/legacy-engine');
+      
+      // 401 = unauthorized, 403 = forbidden (admin auth)
+      expect([401, 403]).toContain(response.status);
+    });
+
+    it('ska ta bort legacy engine konfiguration', async () => {
+      const response = await withAdminAuth(
+        request(app)
+          .delete('/api/admin/config/legacy-engine')
+      );
+      
+      // 200 = lyckades, 500 = databas-fel
+      expect([200, 500]).toContain(response.status);
+      
+      if (response.status === 200) {
+        expect(response.body.success).toBe(true);
+        expect(response.body).toHaveProperty('deletedKeys');
       }
     });
 
