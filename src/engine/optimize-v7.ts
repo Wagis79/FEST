@@ -302,13 +302,23 @@ function resetHighsOnError(): void {
 
 /**
  * Förbered produkter för optimering
+ * Filtrerar på:
+ * - isOptimizable: om produkten är markerad som optimerbar (default: true)
+ * - active: om produkten är aktiv/disponibel (default: true)
+ * - Giltigt pris > 0
+ * - Har minst ett näringsämne
  */
 function prepareProducts(products: Product[]): PreparedProduct[] {
-  // TODO(spec): Om Product får ett fält som uttryckligen markerar optimeringsbar (t.ex. isOptimizable/isSelectable),
-  // filtrera på det här. I dagsläget saknas sådan info i Product-typen, så vi antar att input redan är filtrerad
-  // till optimeringsbara produkter av caller (t.ex. server.ts).
   return products
-    .filter(p => p.id && p.pricePerKg !== undefined && p.pricePerKg > 0)
+    .filter(p => {
+      // Filtrera bort produkter som inte är optimerbara
+      if (p.isOptimizable === false) return false;
+      // Filtrera bort inaktiva produkter
+      if (p.active === false) return false;
+      // Måste ha id och positivt pris
+      if (!p.id || p.pricePerKg === undefined || p.pricePerKg <= 0) return false;
+      return true;
+    })
     .map(p => {
       const n = (p.nutrients.N || 0) / 100;
       const pVal = (p.nutrients.P || 0) / 100;

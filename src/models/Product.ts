@@ -23,4 +23,8 @@ export interface Product {
   pricePerKg: number; // SEK per kg
   nutrients: NutrientContent; // procent
   description?: string;
+  /** Om produkten är tillgänglig för optimering (default: true) */
+  isOptimizable?: boolean;
+  /** Om produkten är aktiv/disponibel i lagersystem (default: true) */
+  active?: boolean;
 }

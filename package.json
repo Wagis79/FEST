@@ -1,6 +1,6 @@
 {
   "name": "fest-nutrient-decision-support",
-  "version": "2.7.3",
+  "version": "2.8.0",
   "description": "Intelligent beslutsstöd för gödselrekommendationer med inköpslista och balanshantering",
   "scripts": {
     "start": "node --max-old-space-size=4096 node_modules/tsx/dist/cli.mjs src/api/start.ts",
@@ -9,6 +9,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:all": "npm run test && npm run test:e2e",
     "smoke:admin": "tsx src/api/smoke-admin.ts",
     "clean": "rm -rf dist"
   },
@@ -23,6 +26,7 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "@playwright/test": "^1.57.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^20.10.5",
@@ -43,6 +47,7 @@
     "helmet": "^8.1.0",
     "highs": "^1.8.0",
     "swagger-ui-express": "^5.0.1",
+    "winston": "^3.19.0",
     "yaml": "^2.8.2"
   }
 }

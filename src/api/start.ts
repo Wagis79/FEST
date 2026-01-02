@@ -6,26 +6,19 @@
 
 import dotenv from 'dotenv';
 import app from './server';
+import log from '../utils/logger';
 
 dotenv.config();
 
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  // eslint-disable-next-line no-console
-  console.log('\n🌾 FEST - Beslutsstöd för gödselrekommendationer 🌾');
-  // eslint-disable-next-line no-console
-  console.log('='.repeat(50));
-  // eslint-disable-next-line no-console
-  console.log(`🚀 Server körs på: http://localhost:${PORT}`);
-  // eslint-disable-next-line no-console
-  console.log(`📊 API: http://localhost:${PORT}/api`);
-  // eslint-disable-next-line no-console
-  console.log(`🔧 Admin: http://localhost:${PORT}/admin.html`);
-  // eslint-disable-next-line no-console
-  console.log(`❤️  Health: http://localhost:${PORT}/health`);
-  // eslint-disable-next-line no-console
-  console.log('='.repeat(50));
-  // eslint-disable-next-line no-console
-  console.log('\n✅ Redo att ta emot förfrågningar!\n');
+  log.startup('FEST - Beslutsstöd för gödselrekommendationer');
+  log.info('='.repeat(50));
+  log.startup(`Server körs på: http://localhost:${PORT}`);
+  log.startup(`API: http://localhost:${PORT}/api`);
+  log.startup(`Admin: http://localhost:${PORT}/admin.html`);
+  log.startup(`Health: http://localhost:${PORT}/health`);
+  log.info('='.repeat(50));
+  log.startup('Redo att ta emot förfrågningar!');
 });

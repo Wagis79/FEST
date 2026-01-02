@@ -9,6 +9,7 @@ import dotenv from 'dotenv';
 import type { NutrientNeed } from '../models/NutrientNeed';
 import type { Strategy } from '../engine/scoring';
 import type { Crop, CropUnit } from '../data/crops';
+import log from '../utils/logger';
 
 // Load environment variables
 dotenv.config();
@@ -96,6 +97,8 @@ export function dbProductToProduct(dbProduct: DBProduct): any {
     pricePerKg: parseFloat(dbProduct.Pris.replace(',', '.')),
     nutrients,
     description: `${dbProduct.Produktklass || 'Mineral'} - ${dbProduct.Övrigt || ''}`.trim(),
+    isOptimizable: dbProduct.Optimeringsbar === 'Ja',
+    active: dbProduct.active !== false, // Default till true om null/undefined
   };
 }
 
@@ -154,6 +157,7 @@ export function productToDBProduct(product: any): Partial<DBProduct> {
  * Fetch all products from Supabase and transform to recommendation engine format
  * Prioriterar produkter med högre näringsinnehåll för bättre optimering
  * Filtrerar bort inaktiva produkter (active = false)
+ * Filtrerar bort produkter som inte är optimerbara (isOptimizable = false)
  */
 export async function getAllProductsForRecommendation(): Promise<any[]> {
   try {
@@ -166,7 +170,7 @@ export async function getAllProductsForRecommendation(): Promise<any[]> {
   .limit(500); // Hämta fler för behovsstyrt urval
 
     if (error) {
-      console.error('Error fetching products from Supabase:', error);
+      log.error('Error fetching products from Supabase', error);
       return [];
     }
 
@@ -177,13 +181,13 @@ export async function getAllProductsForRecommendation(): Promise<any[]> {
     // Transform to Product format for recommendation engine
     const allProducts = data.map(dbProductToProduct);
     
-    console.log(`📦 Hämtade ${allProducts.length} produkter från databasen (Optimeringsbar=Ja)`);
+    log.db(`Hämtade ${allProducts.length} produkter (Optimeringsbar=Ja, active=true)`);
     
     // Returnera alla produkter där Optimeringsbar=Ja (redan filtrerat i query)
     // Ingen ytterligare filtrering på NPKS behövs - kolumnen Optimeringsbar styr
     return allProducts;
   } catch (error) {
-    console.error('Exception fetching products:', error);
+    log.error('Exception fetching products', error);
     return [];
   }
 }

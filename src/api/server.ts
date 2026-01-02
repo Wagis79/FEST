@@ -13,6 +13,7 @@ import fs from 'fs';
 import dotenv from 'dotenv';
 import swaggerUi from 'swagger-ui-express';
 import YAML from 'yaml';
+import log from '../utils/logger';
 import { calculateNutrientNeed, calculateNutrientNeedWithPrecrop, Crop } from '../data/crops';
 import { recommend, RecommendOptions } from '../engine/recommend';
 import { optimizeV7, OptimizeV7Input, OptimizeV7Output } from '../engine/optimize-v7';
@@ -58,9 +59,9 @@ const API_KEYS = new Set(
 
 // Log API key status on startup
 if (API_KEYS.size > 0) {
-  console.log(`🔑 ${API_KEYS.size} API-nyckel(ar) konfigurerade`);
+  log.startup(`${API_KEYS.size} API-nyckel(ar) konfigurerade`);
 } else {
-  console.log('⚠️  Inga API-nycklar konfigurerade - externt API-åtkomst är öppen');
+  log.warn('Inga API-nycklar konfigurerade - externt API-åtkomst är öppen');
 }
 
 // Simple password check middleware for admin
@@ -265,7 +266,7 @@ try {
     };
     
     app.use('/api-docs', swaggerUi.serveFiles(swaggerDocument, externalSwaggerOptions), swaggerUi.setup(swaggerDocument, externalSwaggerOptions));
-    console.log('📚 Swagger UI (extern) available at /api-docs');
+    log.startup('Swagger UI (extern) available at /api-docs');
   }
 
   // Internal API docs (complete documentation)
@@ -283,10 +284,10 @@ try {
     };
     
     app.use('/api-docs-internal', swaggerUi.serveFiles(swaggerInternalDocument, internalSwaggerOptions), swaggerUi.setup(swaggerInternalDocument, internalSwaggerOptions));
-    console.log('📚 Swagger UI (intern) available at /api-docs-internal');
+    log.startup('Swagger UI (intern) available at /api-docs-internal');
   }
 } catch (err) {
-  console.warn('⚠️  Could not load OpenAPI spec for Swagger UI:', err);
+  log.warn('Could not load OpenAPI spec for Swagger UI', { error: err });
 }
 
 // Public static files
@@ -311,7 +312,7 @@ app.get('/api/products', requireApiKey, async (req: Request, res: Response) => {
       products: products,
     });
   } catch (error) {
-    console.error('Error fetching products:', error);
+    log.error('Error fetching products', error);
     res.status(500).json({
       success: false,
       error: 'Kunde inte hämta produkter',
@@ -335,15 +336,14 @@ app.post('/api/recommend', requireApiKey, async (req: Request, res: Response) =>
   try {
   const { need, strategy = 'economic', maxProducts, topN = 10, requiredNutrients, excludedProductIds, requiredProductIds } = req.body;
 
-    console.log('📥 /api/recommend request:', { 
+    log.request('POST', '/api/recommend', { 
       need, 
       strategy, 
-      maxProducts: maxProducts, 
-      maxProductsType: typeof maxProducts,
+      maxProducts, 
       topN, 
       requiredNutrients,
-      excludedProductIds: excludedProductIds ? excludedProductIds.length : 0,
-      requiredProductIds: requiredProductIds ? requiredProductIds.length : 0
+      excludedCount: excludedProductIds?.length || 0,
+      requiredCount: requiredProductIds?.length || 0
     });
 
     // Validera input
@@ -427,7 +427,7 @@ app.post('/api/recommend', requireApiKey, async (req: Request, res: Response) =>
     
     // Logga varningar
     if (warnings.length > 0) {
-      console.log('⚠️  Valideringsvarningar:', warnings);
+      log.warn('Valideringsvarningar', { warnings });
     }
 
   // Hämta produkter från Supabase (behovsstyrt urval för bättre träffbild)
@@ -438,7 +438,7 @@ app.post('/api/recommend', requireApiKey, async (req: Request, res: Response) =>
     const excludedSet = new Set(excludedProductIds);
     const originalCount = products.length;
     products = products.filter(p => !excludedSet.has(p.id));
-    console.log(`🚫 Exkluderade ${originalCount - products.length} produkter (${excludedProductIds.length} angivna)`);
+    log.debug('Produkter exkluderade', { excluded: originalCount - products.length, requested: excludedProductIds.length });
   }
     
     if (products.length === 0) {
@@ -452,9 +452,9 @@ app.post('/api/recommend', requireApiKey, async (req: Request, res: Response) =>
     let algorithmConfig;
     try {
       algorithmConfig = await getAlgorithmConfigMap();
-      console.log('⚙️  Algoritmkonfiguration laddad för /recommend');
+      log.debug('Algoritmkonfiguration laddad för /recommend');
     } catch (configErr) {
-      console.warn('⚠️  Kunde inte ladda algoritmkonfiguration, använder defaults:', configErr);
+      log.warn('Kunde inte ladda algoritmkonfiguration, använder defaults', { error: configErr });
       // Fortsätt med defaults om config inte kan laddas
     }
 
@@ -496,7 +496,7 @@ app.post('/api/recommend', requireApiKey, async (req: Request, res: Response) =>
 
     res.json(response);
   } catch (error) {
-    console.error('Error in /api/recommend:', error);
+    log.error('Error in /api/recommend', error);
     res.status(500).json({
       success: false,
       error: 'Serverfel vid beräkning av rekommendationer',
@@ -534,13 +534,7 @@ app.post('/api/optimize-v7', blockExternalAccess, async (req: Request, res: Resp
       maxDose = 600 
     } = req.body;
 
-    console.log('📥 /api/optimize-v7 request:', { 
-      targets, 
-      mustFlags, 
-      maxProducts,
-      minDose,
-      maxDose 
-    });
+    log.request('POST', '/api/optimize-v7', { targets, mustFlags, maxProducts, minDose, maxDose });
 
     // Validera targets
     if (!targets || typeof targets !== 'object') {
@@ -563,7 +557,7 @@ app.post('/api/optimize-v7', blockExternalAccess, async (req: Request, res: Resp
       });
     }
 
-    console.log(`🔧 V7-optimering med ${products.length} produkter`);
+    log.optimize(`V7-optimering med ${products.length} produkter`);
 
     // Kör V7-optimering
     const input: OptimizeV7Input = {
@@ -588,21 +582,21 @@ app.post('/api/optimize-v7', blockExternalAccess, async (req: Request, res: Resp
     try {
       const algorithmConfig = await getAlgorithmConfigMap();
       input.config = algorithmConfig;
-      console.log('⚙️  Algoritmkonfiguration laddad för /optimize-v7');
+      log.debug('Algoritmkonfiguration laddad för /optimize-v7');
     } catch (configErr) {
-      console.warn('⚠️  Kunde inte ladda algoritmkonfiguration, använder defaults:', configErr);
+      log.warn('Kunde inte ladda algoritmkonfiguration, använder defaults', { error: configErr });
     }
 
     const result = await optimizeV7(products, input);
 
-    console.log(`✅ V7 returnerade: ${result.strategies.length} strategier, status: ${result.status}`);
+    log.optimize(`V7 klar: ${result.strategies.length} strategier`, { status: result.status });
 
     res.json({
       success: result.status === 'ok',
       ...result,
     });
   } catch (error) {
-    console.error('Error in /api/optimize-v7:', error);
+    log.error('Error in /api/optimize-v7', error);
     res.status(500).json({
       success: false,
       status: 'error',
@@ -629,7 +623,7 @@ app.get('/api/crops', requireApiKey, async (req: Request, res: Response) => {
     }
     
     if (crops.length === 0) {
-      console.error('❌ Inga grödor hittades i databasen');
+      log.error('Inga grödor hittades i databasen');
       return res.status(503).json({
         success: false,
         error: 'Kunde inte hämta grödor från databasen',
@@ -642,7 +636,7 @@ app.get('/api/crops', requireApiKey, async (req: Request, res: Response) => {
       crops: crops,
     });
   } catch (error) {
-    console.error('Error fetching crops:', error);
+    log.error('Error fetching crops', error);
     res.status(500).json({
       success: false,
       error: 'Serverfel vid hämtning av grödor',
@@ -713,7 +707,7 @@ app.post('/api/calculate-need', requireApiKey, async (req: Request, res: Respons
       } : null,
     });
   } catch (error) {
-    console.error('Error in /api/calculate-need:', error);
+    log.error('Error in /api/calculate-need', error);
     res.status(500).json({
       success: false,
       error: 'Serverfel vid beräkning av näringsbehov',
@@ -753,7 +747,7 @@ app.get('/api/admin/products', requireAdminPassword, async (req: Request, res: R
       .order('Produkt', { ascending: true });
 
     if (error) {
-      console.error('Supabase error:', error);
+      log.error('Supabase error fetching products', error);
       return res.status(500).json({
         success: false,
         error: 'Failed to fetch products from database',
@@ -764,7 +758,7 @@ app.get('/api/admin/products', requireAdminPassword, async (req: Request, res: R
     // Return raw database data (no transformation)
     res.json(data || []);
   } catch (error: any) {
-    console.error('Server error:', error);
+    log.error('Server error in admin products', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error',
@@ -808,7 +802,7 @@ app.post('/api/admin/products', requireAdminPassword, async (req: Request, res: 
       .single();
 
     if (error) {
-      console.error('Supabase error:', error);
+      log.error('Supabase error', error);
       return res.status(500).json({
         success: false,
         error: 'Failed to add product to database',
@@ -822,7 +816,7 @@ app.post('/api/admin/products', requireAdminPassword, async (req: Request, res: 
       product: dbProductToProduct(data),
     });
   } catch (error: any) {
-    console.error('Server error:', error);
+    log.error('Server error', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error',
@@ -865,7 +859,7 @@ app.put('/api/admin/products/:id', requireAdminPassword, async (req: Request, re
       .single();
 
     if (error) {
-      console.error('Supabase error:', error);
+      log.error('Supabase error', error);
       return res.status(500).json({
         success: false,
         error: 'Failed to update product in database',
@@ -886,7 +880,7 @@ app.put('/api/admin/products/:id', requireAdminPassword, async (req: Request, re
       product: dbProductToProduct(data),
     });
   } catch (error: any) {
-    console.error('Server error:', error);
+    log.error('Server error', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error',
@@ -913,7 +907,7 @@ app.delete('/api/admin/products/:id', requireAdminPassword, async (req: Request,
       .eq('Artikelnr', artikelnr);
 
     if (error) {
-      console.error('Supabase error:', error);
+      log.error('Supabase error', error);
       return res.status(500).json({
         success: false,
         error: 'Failed to delete product from database',
@@ -927,7 +921,7 @@ app.delete('/api/admin/products/:id', requireAdminPassword, async (req: Request,
       productId: id,
     });
   } catch (error: any) {
-    console.error('Server error:', error);
+    log.error('Server error', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error',
@@ -962,7 +956,7 @@ app.post('/api/webhook/m3-product', async (req: Request, res: Response) => {
     const webhookSecret = req.headers['x-webhook-secret'] as string;
     
     if (!M3_WEBHOOK_SECRET) {
-      console.error('M3 webhook: No M3_WEBHOOK_SECRET configured');
+      log.security('M3 webhook: No M3_WEBHOOK_SECRET configured');
       return res.status(503).json({
         success: false,
         error: 'Webhook not configured',
@@ -971,7 +965,7 @@ app.post('/api/webhook/m3-product', async (req: Request, res: Response) => {
     }
 
     if (!webhookSecret || webhookSecret !== M3_WEBHOOK_SECRET) {
-      console.warn('M3 webhook: Invalid or missing secret');
+      log.security('M3 webhook: Invalid or missing secret');
       return res.status(401).json({
         success: false,
         error: 'Invalid webhook secret',
@@ -1046,7 +1040,7 @@ app.post('/api/webhook/m3-product', async (req: Request, res: Response) => {
     });
 
   } catch (error: any) {
-    console.error('M3 webhook error:', error);
+    log.error('M3 webhook error', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error',
@@ -1148,7 +1142,7 @@ app.get('/api/admin/product-analysis', requireAdminPassword, async (req: Request
     });
 
   } catch (error: any) {
-    console.error('Product analysis error:', error);
+    log.error('Product analysis error', error);
     res.status(500).json({
       success: false,
       error: 'Failed to analyze products',
@@ -1171,7 +1165,7 @@ app.get('/api/admin/crops', requireAdminPassword, async (req: Request, res: Resp
     const crops = await getAllCropsRaw();
     res.json(crops);
   } catch (error: any) {
-    console.error('Error fetching crops:', error);
+    log.error('Error fetching crops', error);
     res.status(500).json({
       success: false,
       error: 'Kunde inte hämta grödor',
@@ -1223,10 +1217,10 @@ app.post('/api/admin/crops', requireAdminPassword, async (req: Request, res: Res
     
     const newCrop = await createCrop(cropData);
     
-    console.log(`✅ Gröda skapad: ${newCrop.name}`);
+    log.info('Gröda skapad', { name: newCrop.name });
     res.status(201).json(newCrop);
   } catch (error: any) {
-    console.error('Error creating crop:', error);
+    log.error('Error creating crop', error);
     res.status(500).json({
       success: false,
       error: 'Kunde inte skapa gröda',
@@ -1264,10 +1258,10 @@ app.put('/api/admin/crops/:id', requireAdminPassword, async (req: Request, res: 
     
     const updatedCrop = await updateCrop(cropId, cropData);
     
-    console.log(`✅ Gröda uppdaterad: ${cropId}`);
+    log.info('Gröda uppdaterad', { cropId });
     res.json(updatedCrop);
   } catch (error: any) {
-    console.error('Error updating crop:', error);
+    log.error('Error updating crop', error);
     res.status(500).json({
       success: false,
       error: 'Kunde inte uppdatera gröda',
@@ -1287,10 +1281,10 @@ app.delete('/api/admin/crops/:id', requireAdminPassword, async (req: Request, re
     
     await deleteCrop(cropId);
     
-    console.log(`✅ Gröda borttagen: ${cropId}`);
+    log.info('Gröda borttagen', { cropId });
     res.json({ success: true, message: 'Gröda borttagen' });
   } catch (error: any) {
-    console.error('Error deleting crop:', error);
+    log.error('Error deleting crop', error);
     res.status(500).json({
       success: false,
       error: 'Kunde inte ta bort gröda',
@@ -1318,7 +1312,7 @@ app.get('/api/admin/config', requireAdminPassword, async (req: Request, res: Res
       config: config,
     });
   } catch (error: any) {
-    console.error('Error fetching algorithm config:', error);
+    log.error('Error fetching algorithm config', error);
     res.status(500).json({
       success: false,
       error: 'Kunde inte hämta algoritmkonfiguration',
@@ -1349,7 +1343,7 @@ app.get('/api/admin/config/:key', requireAdminPassword, async (req: Request, res
       param: param,
     });
   } catch (error: any) {
-    console.error('Error fetching config param:', error);
+    log.error('Error fetching config param', error);
     res.status(500).json({
       success: false,
       error: 'Kunde inte hämta konfigurationsparameter',
@@ -1389,14 +1383,14 @@ app.put('/api/admin/config/:key', requireAdminPassword, async (req: Request, res
     const config = await getAlgorithmConfig();
     const param = config.find(c => c.key === key);
     
-    console.log(`✅ Konfiguration uppdaterad: ${key} = ${numValue}`);
+    log.info('Konfiguration uppdaterad', { key, value: numValue });
     res.json({
       success: true,
       message: `Konfiguration uppdaterad: ${key} = ${numValue}`,
       param: param,
     });
   } catch (error: any) {
-    console.error('Error updating config:', error);
+    log.error('Error updating config', error);
     res.status(400).json({
       success: false,
       error: error.message || 'Kunde inte uppdatera konfiguration',
@@ -1439,14 +1433,14 @@ app.post('/api/admin/config/batch', requireAdminPassword, async (req: Request, r
     
     const successCount = results.filter(r => r.success).length;
     
-    console.log(`✅ Batch-uppdatering: ${successCount}/${updates.length} lyckades`);
+    log.info('Batch-uppdatering klar', { successCount, total: updates.length });
     res.json({
       success: successCount === updates.length,
       message: `${successCount} av ${updates.length} uppdateringar lyckades`,
       results: results,
     });
   } catch (error: any) {
-    console.error('Error batch updating config:', error);
+    log.error('Error batch updating config', error);
     res.status(500).json({
       success: false,
       error: 'Kunde inte uppdatera konfiguration',
@@ -1469,7 +1463,7 @@ app.delete('/api/admin/config/legacy-engine', requireAdminPassword, async (req: 
       deletedKeys: ['USE_V5', 'USE_V6', 'USE_V7'].slice(0, deletedCount),
     });
   } catch (error: any) {
-    console.error('Error deleting legacy engine config:', error);
+    log.error('Error deleting legacy engine config', error);
     res.status(500).json({
       success: false,
       error: 'Kunde inte ta bort legacy konfiguration',

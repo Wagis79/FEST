@@ -2,6 +2,44 @@
 
 Alla viktiga ändringar i projektet dokumenteras här.
 
+## [2.8.0] - 2026-01-02
+
+### 📊 Strukturerad loggning
+
+#### Winston Logger
+- **Centraliserad loggning** - Ersatt 40+ console.log/warn/error med strukturerad logging
+  - `src/utils/logger.ts` - Ny loggnings-modul med Winston
+  - Färgkodade loggar i development
+  - JSON-format i produktion
+  - Domänspecifika metoder: `log.request()`, `log.optimize()`, `log.db()`, `log.security()`, `log.startup()`
+  - Request-id stöd för spårbarhet
+
+### 🏗️ Product-modell utökad
+
+#### Nya fält i Product
+- **isOptimizable** - `boolean` för att markera produkter som kan användas i optimering
+- **active** - `boolean` för att aktivera/inaktivera produkter
+- Optimeringsalgoritmen filtrerar nu på båda fälten
+
+### 🧪 E2E-testning
+
+#### Playwright Integration
+- **12 E2E-tester** - Testar applikationen från användarens perspektiv
+  - `e2e/basic.spec.ts` - Startsida, API-endpoints, admin-panel
+  - `e2e/optimization-flow.spec.ts` - Optimeringsflöde och resultatvisning
+  - `playwright.config.ts` - Konfiguration med automatisk serverstart
+
+#### Nya npm-scripts
+- `npm run test:e2e` - Kör E2E-tester
+- `npm run test:e2e:ui` - Interaktiv testmiljö
+- `npm run test:all` - Kör både unit- och E2E-tester
+
+#### Nya dependencies
+- `@playwright/test` ^1.x (dev)
+- `winston` ^3.x
+
+---
+
 ## [2.7.3] - 2026-01-02
 
 ### 🔒 Säkerhetsförbättringar
