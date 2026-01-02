@@ -83,6 +83,66 @@ describe('GET /api/crops', () => {
 });
 
 // ============================================================================
+// SAME-ORIGIN API ACCESS (X-Requested-With header)
+// ============================================================================
+
+describe('Same-origin API access', () => {
+  
+  it('ska tillåta API-anrop med X-Requested-With header utan API-nyckel', async () => {
+    const response = await request(app)
+      .get('/api/crops')
+      .set('X-Requested-With', 'XMLHttpRequest')
+      .set('Accept', 'application/json');
+    
+    // Bör få 200 eller 503 (databas), inte 401 (unauthorized)
+    expect([200, 503]).toContain(response.status);
+    expect(response.status).not.toBe(401);
+  });
+
+  it('ska tillåta API-anrop med X-Requested-With header till /api/products', async () => {
+    const response = await request(app)
+      .get('/api/products')
+      .set('X-Requested-With', 'XMLHttpRequest')
+      .set('Accept', 'application/json');
+    
+    expect([200, 503]).toContain(response.status);
+    expect(response.status).not.toBe(401);
+    
+    if (response.status === 200) {
+      expect(response.body).toHaveProperty('success', true);
+      expect(response.body).toHaveProperty('products');
+    }
+  });
+
+  it('ska tillåta POST /api/recommend med X-Requested-With header', async () => {
+    const response = await request(app)
+      .post('/api/recommend')
+      .set('X-Requested-With', 'XMLHttpRequest')
+      .set('Content-Type', 'application/json')
+      .send({
+        need: { N: 100 },
+        requiredNutrients: ['N'],
+        maxProducts: 2
+      });
+    
+    // Bör få 200 eller 500/503 (databas/optimering), inte 401
+    expect(response.status).not.toBe(401);
+  });
+
+  it('ska neka API-anrop utan X-Requested-With eller API-nyckel', async () => {
+    const response = await request(app)
+      .get('/api/crops')
+      .set('Accept', 'application/json');
+    
+    // Ska få 401 Unauthorized
+    expect(response.status).toBe(401);
+    expect(response.body).toHaveProperty('success', false);
+    expect(response.body.code).toBe('MISSING_API_KEY');
+  });
+
+});
+
+// ============================================================================
 // RECOMMEND API
 // ============================================================================
 
@@ -258,6 +318,69 @@ describe('POST /api/recommend', () => {
       
       if (response.status === 200) {
         expect(response.body).toHaveProperty('success', true);
+      }
+    });
+
+    it('ska inkludera requiredProductIds i lösningen', async () => {
+      // Först hämta en giltig produkt-ID från databasen
+      const productsResponse = await request(app)
+        .get('/api/products')
+        .set('X-Requested-With', 'XMLHttpRequest')
+        .set('Accept', 'application/json');
+      
+      if (productsResponse.status !== 200 || !productsResponse.body.products?.length) {
+        // Hoppa över om vi inte kan hämta produkter
+        return;
+      }
+      
+      // Hitta en produkt med N-innehåll
+      const nProduct = productsResponse.body.products.find(
+        (p: { nutrients?: { N?: number }, id: string }) => p.nutrients?.N && p.nutrients.N > 0
+      );
+      
+      if (!nProduct) {
+        return; // Hoppa över om ingen N-produkt finns
+      }
+      
+      const response = await withApiKey(
+        request(app)
+          .post('/api/recommend')
+          .set('Accept', 'application/json')
+          .send({
+            need: { N: 150, P: 20, K: 30, S: 10 },
+            requiredNutrients: ['N', 'P', 'K', 'S'],
+            maxProducts: 3,
+            requiredProductIds: [nProduct.id]
+          })
+      );
+      
+      if (response.status === 200 && response.body.solutions?.length > 0) {
+        expect(response.body).toHaveProperty('success', true);
+        
+        // Verifiera att den tvingade produkten finns med i första lösningen
+        const firstSolution = response.body.solutions[0];
+        const productIds = firstSolution.products.map((p: { productId: string }) => p.productId);
+        
+        expect(productIds).toContain(nProduct.id);
+      }
+    });
+
+    it('ska returnera requiredProductIds i response', async () => {
+      const response = await withApiKey(
+        request(app)
+          .post('/api/recommend')
+          .set('Accept', 'application/json')
+          .send({
+            need: { N: 100 },
+            requiredNutrients: ['N'],
+            maxProducts: 2,
+            requiredProductIds: ['prod-test123']
+          })
+      );
+      
+      if (response.status === 200) {
+        expect(response.body).toHaveProperty('requiredProductIds');
+        expect(response.body.requiredProductIds).toContain('prod-test123');
       }
     });
 
