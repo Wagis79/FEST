@@ -10,6 +10,12 @@
  * Körs som separat process för att isolera WASM-krascher.
  * Kommunicerar via stdin/stdout med JSON-meddelanden.
  * 
+ * VIKTIGT: Denna fil använder console.log/console.error medvetet:
+ * - console.log() = stdout = JSON-svar till huvudprocessen (IPC)
+ * - console.error() = stderr = debug-loggning (fångas av highs-pool.ts → Winston)
+ * 
+ * Använd INTE winston/log direkt här - det skulle blanda ihop IPC-protokollet.
+ * 
  * Användning:
  *   node --loader tsx highs-worker.ts
  *   
