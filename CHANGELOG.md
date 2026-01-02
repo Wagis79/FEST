@@ -2,6 +2,27 @@
 
 Alla viktiga ändringar i projektet dokumenteras här.
 
+## [2.7.2] - 2026-01-02
+
+### 🧪 Utökad testsvit + CI/CD
+
+#### Ny funktionalitet
+- **GitHub Actions CI** - Automatiserad testkörning vid push/PR
+  - Workflow: `.github/workflows/test.yml`
+  - Körs på `ubuntu-latest` med Node.js 20
+  - Coverage-rapport sparas som artifact
+
+- **M3 Webhook-tester** - 7 nya tester för `/api/webhook/m3-product`
+  - Autentisering (saknad/ogiltig secret)
+  - Validering (saknad itemNumber, inga uppdateringar)
+  - Framgångsfall (pris, active-status, kombinerad)
+
+#### Teststatistik
+- **38 tester totalt** (12 motor + 26 API)
+- Testtid: ~7.5 sekunder
+
+---
+
 ## [2.7.1] - 2026-01-01
 
 ### 🧪 Automatiserat testramverk

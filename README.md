@@ -463,13 +463,20 @@ src/__tests__/
 ├── engine/
 │   └── optimize-v7.test.ts   # MILP-motor tester (12 tester)
 └── api/
-    └── server.test.ts        # API integrationstester (19 tester)
+    └── server.test.ts        # API integrationstester (26 tester)
 ```
 
 #### Vad testas
 
 - **Optimeringsmotor (V7):** Multi-näringslösning, enskilda näringsämnen, N-toleranseskalering, PKS-krav, kantfall
 - **API-endpoints:** Validering, autentisering, /health, /api/crops, /api/recommend, /api/calculate-need
+- **M3 Webhook:** Autentisering, validering, prisuppdatering, active-status
+
+#### CI/CD
+
+Testerna körs automatiskt via GitHub Actions vid varje push till `main` och vid pull requests.
+
+Se status: https://github.com/Wagis79/FEST/actions
 
 ### Teknisk stack
 
