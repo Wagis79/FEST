@@ -18,7 +18,7 @@ info:
     - **Extern (API-nyckel)**: `/api/recommend`, `/api/products`, `/api/crops`, `/api/calculate-need`
     - **Intern**: `/api/optimize-v7`
     - **Admin**: `/api/admin/*`
-  version: 1.0.0
+  version: 2.8.4
   contact:
     name: FEST Development Team
 
@@ -39,6 +39,8 @@ tags:
     description: Gödselprodukter
   - name: Admin
     description: Administrationsendpoints (kräver admin-lösenord)
+  - name: Webhook
+    description: Webhook-integrationer (M3 ERP)
 
 paths:
   # ============================================================================
@@ -340,6 +342,152 @@ paths:
         '200':
           description: Konfiguration uppdaterad
 
+  /api/admin/config/{key}:
+    get:
+      tags: [Admin]
+      summary: Hämta specifik konfigurationsnyckel
+      operationId: adminGetConfigKey
+      security:
+        - AdminAuth: []
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Konfigurationsnyckel
+      responses:
+        '200':
+          description: Konfigurationsvärde
+        '404':
+          description: Nyckel finns ej
+    put:
+      tags: [Admin]
+      summary: Uppdatera specifik konfigurationsnyckel
+      operationId: adminUpdateConfigKey
+      security:
+        - AdminAuth: []
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                value:
+                  type: number
+              required: [value]
+      responses:
+        '200':
+          description: Nyckel uppdaterad
+
+  /api/admin/config/batch:
+    post:
+      tags: [Admin]
+      summary: Batch-uppdatering av konfiguration
+      operationId: adminBatchUpdateConfig
+      security:
+        - AdminAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                updates:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      key:
+                        type: string
+                      value:
+                        type: string
+                    required: [key, value]
+              required: [updates]
+      responses:
+        '200':
+          description: Batch-uppdatering utförd
+
+  /api/admin/config/legacy-engine:
+    delete:
+      tags: [Admin]
+      summary: Ta bort legacy motorval-konfiguration
+      operationId: adminDeleteLegacyEngine
+      security:
+        - AdminAuth: []
+      responses:
+        '200':
+          description: Legacy-konfiguration borttagen
+
+  /api/admin/product-analysis:
+    get:
+      tags: [Admin]
+      summary: Analysera produkter
+      operationId: adminProductAnalysis
+      security:
+        - AdminAuth: []
+      responses:
+        '200':
+          description: Produktanalysdata
+
+  /api/webhook/m3-product:
+    post:
+      tags: [Webhook]
+      summary: M3 ERP produkt-webhook
+      description: Webhook för produktuppdateringar från M3 ERP-system
+      operationId: m3ProductWebhook
+      security:
+        - WebhookSecret: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                event:
+                  type: string
+                  enum: [product.created, product.updated, product.deleted]
+                timestamp:
+                  type: string
+                  format: date-time
+                data:
+                  type: object
+                  properties:
+                    itemNumber:
+                      type: string
+                    name:
+                      type: string
+                    pricePerTon:
+                      type: number
+                    n:
+                      type: number
+                    p:
+                      type: number
+                    k:
+                      type: number
+                    s:
+                      type: number
+                    active:
+                      type: boolean
+                  required: [itemNumber]
+              required: [event, data]
+      responses:
+        '200':
+          description: Webhook mottagen och bearbetad
+        '401':
+          description: Ogiltig eller saknad webhook-secret
+        '404':
+          description: Produkt hittades inte
+
 components:
   securitySchemes:
     ApiKeyAuth:
@@ -352,6 +500,11 @@ components:
       in: header
       name: X-Admin-Password
       description: Admin-lösenord
+    WebhookSecret:
+      type: apiKey
+      in: header
+      name: X-Webhook-Secret
+      description: Webhook hemlig nyckel för M3-integrering
 
   schemas:
     NutrientNeed:

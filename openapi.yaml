@@ -39,7 +39,7 @@ info:
     ## Begränsningar
     - Endast läsoperationer och beräkningar är tillgängliga
     - Inga skriv- eller ändringsoperationer
-  version: 2.8.2
+  version: 2.8.4
   contact:
     name: FEST API Support
   license:
