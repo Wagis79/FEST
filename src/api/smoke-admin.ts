@@ -19,14 +19,39 @@ type SimResult = {
   body: string;
 };
 
+/** Minimal request-like object for testing */
+interface MockRequest {
+  method: string;
+  url: string;
+  path: string;
+  headers: Record<string, string>;
+  body?: unknown;
+  query: Record<string, string>;
+  ip: string;
+  socket: { remoteAddress: string };
+}
+
+/** Minimal response-like object for testing */
+interface MockResponse {
+  statusCode: number;
+  _headers: Record<string, string | string[]>;
+  _body: string;
+  setHeader(name: string, value: string | string[]): void;
+  getHeader(name: string): string | string[] | undefined;
+  status(code: number): MockResponse;
+  json(obj: unknown): void;
+  send(payload: unknown): void;
+  end(): void;
+}
+
 function simulate(
   method: string,
   path: string,
   headers: Record<string, string> = {},
-  body?: any
+  body?: unknown
 ): Promise<SimResult> {
   return new Promise((resolve) => {
-    const req: any = {
+    const req: MockRequest = {
       method,
       url: path,
       path,
@@ -39,11 +64,11 @@ function simulate(
       socket: { remoteAddress: '127.0.0.1' },
     };
 
-    const res: any = {
+    const res: MockResponse = {
       statusCode: 200,
       _headers: {} as Record<string, string | string[]>,
       _body: '' as string,
-      setHeader(name: string, value: any) {
+      setHeader(name: string, value: string | string[]) {
         this._headers[name.toLowerCase()] = value;
       },
       getHeader(name: string) {
@@ -53,12 +78,12 @@ function simulate(
         this.statusCode = code;
         return this;
       },
-      json(obj: any) {
+      json(obj: unknown) {
         this.setHeader('content-type', 'application/json');
         this._body = JSON.stringify(obj);
         resolve({ status: this.statusCode, headers: this._headers, body: this._body });
       },
-      send(payload: any) {
+      send(payload: unknown) {
         this._body = typeof payload === 'string' ? payload : String(payload);
         resolve({ status: this.statusCode, headers: this._headers, body: this._body });
       },
@@ -68,12 +93,13 @@ function simulate(
     };
     try {
       // Express apps are callable request handlers
-      (app as any)(req, res);
-    } catch (e: any) {
+      (app as unknown as (req: MockRequest, res: MockResponse) => void)(req, res);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
       resolve({
         status: 500,
         headers: res._headers,
-        body: `simulate() crash: ${e?.message || String(e)}`,
+        body: `simulate() crash: ${msg}`,
       });
     }
   });

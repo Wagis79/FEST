@@ -11,7 +11,7 @@
  * och att en giltig nyckel används i testerna.
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import request from 'supertest';
 import app from '../../api/server';
 
@@ -199,7 +199,8 @@ describe('POST /api/recommend', () => {
         expect(response.body.count).toBeLessThanOrEqual(3);
         
         // Verifiera att lösningarna är sorterade på kostnad
-        const costs = response.body.solutions.map((s: any) => s.costPerHa);
+        interface SolutionWithCost { costPerHa: number }
+        const costs = response.body.solutions.map((s: SolutionWithCost) => s.costPerHa);
         for (let i = 1; i < costs.length; i++) {
           expect(costs[i]).toBeGreaterThanOrEqual(costs[i-1]);
         }

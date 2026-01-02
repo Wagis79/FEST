@@ -9,7 +9,7 @@
  * - Varningar för höga nivåer
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import type {
   OptimizeV7Input} from '../../engine/optimize-v7';
 import { 

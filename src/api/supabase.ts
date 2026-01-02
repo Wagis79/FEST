@@ -765,7 +765,7 @@ export async function updateProductFromM3(
   updates: { price?: number; active?: boolean }
 ): Promise<{ found: boolean; updated: boolean; artikelnr: number }> {
   try {
-    const updateData: Record<string, any> = {};
+    const updateData: Partial<DBProduct> = {};
     
     if (updates.price !== undefined) {
       updateData.Pris = updates.price.toString().replace('.', ',');

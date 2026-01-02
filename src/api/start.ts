@@ -14,7 +14,7 @@ dotenv.config();
 
 const PORT = process.env.PORT || 3000;
 
-let server: Server;
+let server: Server | null = null;
 
 // Graceful shutdown handler
 async function shutdown(signal: string) {

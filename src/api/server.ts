@@ -15,28 +15,24 @@ import dotenv from 'dotenv';
 import swaggerUi from 'swagger-ui-express';
 import YAML from 'yaml';
 import log from '../utils/logger';
-import { calculateNutrientNeed, calculateNutrientNeedWithPrecrop, Crop } from '../data/crops';
+import { calculateNutrientNeed, calculateNutrientNeedWithPrecrop } from '../data/crops';
 import type { RecommendOptions } from '../engine/recommend';
 import { recommend } from '../engine/recommend';
-import type { OptimizeV7Input} from '../engine/optimize-v7';
-import { optimizeV7, OptimizeV7Output } from '../engine/optimize-v7';
+import type { OptimizeV7Input } from '../engine/optimize-v7';
+import { optimizeV7 } from '../engine/optimize-v7';
 import type { NutrientNeed } from '../models/NutrientNeed';
-import { Strategy } from '../engine/scoring';
-import { Product } from '../models/Product';
 import { 
   validateBody,
   RecommendRequestSchema,
-  OptimizeV7RequestSchema,
-  NutrientNeedRequestSchema,
   generateInputWarnings,
   type RecommendRequest,
 } from './validation';
+import type { DBProduct } from './supabase';
 import { 
   supabase,
   supabaseAdmin,
   PRODUCTS_TABLE, 
   dbProductToProduct, 
-  dbProductToAdminProduct,
   productToDBProduct,
   getAllProductsForRecommendation,
   getProductsForRecommendation,
@@ -52,7 +48,13 @@ import {
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const _PORT = process.env.PORT || 3000;
+
+/** Helper to extract error message from unknown error */
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
 
 // Admin password from environment
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
@@ -543,10 +545,15 @@ app.post('/api/optimize-v7', blockExternalAccess, async (req: Request, res: Resp
 app.get('/api/crops', requireApiKey, async (req: Request, res: Response) => {
   try {
     const category = req.query.category as string | undefined;
+    const validCategories = ['spannmal', 'oljevaxte', 'rotfrukter', 'grovfoder', 'ovriga'] as const;
+    type CropCategory = typeof validCategories[number];
     
     let crops;
-    if (category) {
-      crops = await getCropsByCategory(category as any);
+    if (category && validCategories.includes(category as CropCategory)) {
+      crops = await getCropsByCategory(category as CropCategory);
+    } else if (category) {
+      // Invalid category - return all crops with a warning
+      crops = await getAllCrops();
     } else {
       crops = await getAllCrops();
     }
@@ -680,18 +687,18 @@ app.get('/api/admin/products', requireAdminPassword, async (req: Request, res: R
       return res.status(500).json({
         success: false,
         error: 'Failed to fetch products from database',
-        details: error.message,
+        details: getErrorMessage(error),
       });
     }
 
     // Return raw database data (no transformation)
     res.json(data || []);
-  } catch (error: any) {
+  } catch (error) {
     log.error('Server error in admin products', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error',
-      details: error.message,
+      details: getErrorMessage(error),
     });
   }
 });
@@ -705,7 +712,7 @@ app.post('/api/admin/products', requireAdminPassword, async (req: Request, res: 
     const product = req.body;
 
     // Check if data is in DB format (from admin.js) or app format
-    let dbProduct: any;
+    let dbProduct: Partial<DBProduct>;
     if (product.Artikelnr !== undefined && product.Produkt !== undefined) {
       // Already in DB format from admin.js
       dbProduct = { ...product };
@@ -735,7 +742,7 @@ app.post('/api/admin/products', requireAdminPassword, async (req: Request, res: 
       return res.status(500).json({
         success: false,
         error: 'Failed to add product to database',
-        details: error.message,
+        details: getErrorMessage(error),
       });
     }
 
@@ -744,12 +751,12 @@ app.post('/api/admin/products', requireAdminPassword, async (req: Request, res: 
       message: 'Product added successfully',
       product: dbProductToProduct(data),
     });
-  } catch (error: any) {
+  } catch (error) {
     log.error('Server error', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error',
-      details: error.message,
+      details: getErrorMessage(error),
     });
   }
 });
@@ -768,7 +775,7 @@ app.put('/api/admin/products/:id', requireAdminPassword, async (req: Request, re
 
     // If data comes from admin.js (already in DB format with Artikelnr), use directly
     // Otherwise transform from app format
-    let dbProduct: any;
+    let dbProduct: Partial<DBProduct>;
     if (product.Artikelnr !== undefined) {
       // Already in DB format from admin.js
       dbProduct = { ...product };
@@ -792,7 +799,7 @@ app.put('/api/admin/products/:id', requireAdminPassword, async (req: Request, re
       return res.status(500).json({
         success: false,
         error: 'Failed to update product in database',
-        details: error.message,
+        details: getErrorMessage(error),
       });
     }
 
@@ -808,12 +815,12 @@ app.put('/api/admin/products/:id', requireAdminPassword, async (req: Request, re
       message: 'Product updated successfully',
       product: dbProductToProduct(data),
     });
-  } catch (error: any) {
+  } catch (error) {
     log.error('Server error', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error',
-      details: error.message,
+      details: getErrorMessage(error),
     });
   }
 });
@@ -840,7 +847,7 @@ app.delete('/api/admin/products/:id', requireAdminPassword, async (req: Request,
       return res.status(500).json({
         success: false,
         error: 'Failed to delete product from database',
-        details: error.message,
+        details: getErrorMessage(error),
       });
     }
 
@@ -849,12 +856,12 @@ app.delete('/api/admin/products/:id', requireAdminPassword, async (req: Request,
       message: 'Product deleted successfully',
       productId: id,
     });
-  } catch (error: any) {
+  } catch (error) {
     log.error('Server error', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error',
-      details: error.message,
+      details: getErrorMessage(error),
     });
   }
 });
@@ -968,12 +975,12 @@ app.post('/api/webhook/m3-product', async (req: Request, res: Response) => {
       updates
     });
 
-  } catch (error: any) {
+  } catch (error) {
     log.error('M3 webhook error', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error',
-      details: error.message
+      details: getErrorMessage(error)
     });
   }
 });
@@ -1070,12 +1077,12 @@ app.get('/api/admin/product-analysis', requireAdminPassword, async (req: Request
       timestamp: new Date().toISOString()
     });
 
-  } catch (error: any) {
+  } catch (error) {
     log.error('Product analysis error', error);
     res.status(500).json({
       success: false,
       error: 'Failed to analyze products',
-      details: error.message,
+      details: getErrorMessage(error),
     });
   }
 });
@@ -1093,12 +1100,12 @@ app.get('/api/admin/crops', requireAdminPassword, async (req: Request, res: Resp
     const { getAllCropsRaw } = await import('./supabase');
     const crops = await getAllCropsRaw();
     res.json(crops);
-  } catch (error: any) {
+  } catch (error) {
     log.error('Error fetching crops', error);
     res.status(500).json({
       success: false,
       error: 'Kunde inte hämta grödor',
-      details: error.message,
+      details: getErrorMessage(error),
     });
   }
 });
@@ -1148,12 +1155,12 @@ app.post('/api/admin/crops', requireAdminPassword, async (req: Request, res: Res
     
     log.info('Gröda skapad', { name: newCrop.name });
     res.status(201).json(newCrop);
-  } catch (error: any) {
+  } catch (error) {
     log.error('Error creating crop', error);
     res.status(500).json({
       success: false,
       error: 'Kunde inte skapa gröda',
-      details: error.message,
+      details: getErrorMessage(error),
     });
   }
 });
@@ -1189,12 +1196,12 @@ app.put('/api/admin/crops/:id', requireAdminPassword, async (req: Request, res: 
     
     log.info('Gröda uppdaterad', { cropId });
     res.json(updatedCrop);
-  } catch (error: any) {
+  } catch (error) {
     log.error('Error updating crop', error);
     res.status(500).json({
       success: false,
       error: 'Kunde inte uppdatera gröda',
-      details: error.message,
+      details: getErrorMessage(error),
     });
   }
 });
@@ -1212,12 +1219,12 @@ app.delete('/api/admin/crops/:id', requireAdminPassword, async (req: Request, re
     
     log.info('Gröda borttagen', { cropId });
     res.json({ success: true, message: 'Gröda borttagen' });
-  } catch (error: any) {
+  } catch (error) {
     log.error('Error deleting crop', error);
     res.status(500).json({
       success: false,
       error: 'Kunde inte ta bort gröda',
-      details: error.message,
+      details: getErrorMessage(error),
     });
   }
 });
@@ -1232,20 +1239,20 @@ app.delete('/api/admin/crops/:id', requireAdminPassword, async (req: Request, re
  */
 app.get('/api/admin/config', requireAdminPassword, async (req: Request, res: Response) => {
   try {
-    const { getAlgorithmConfig } = await import('./supabase');
-    const config = await getAlgorithmConfig();
+    const supabaseModule = await import('./supabase');
+    const config = await supabaseModule.getAlgorithmConfig();
     
     res.json({
       success: true,
       count: config.length,
       config: config,
     });
-  } catch (error: any) {
+  } catch (error) {
     log.error('Error fetching algorithm config', error);
     res.status(500).json({
       success: false,
       error: 'Kunde inte hämta algoritmkonfiguration',
-      details: error.message,
+      details: getErrorMessage(error),
     });
   }
 });
@@ -1271,12 +1278,12 @@ app.get('/api/admin/config/:key', requireAdminPassword, async (req: Request, res
       success: true,
       param: param,
     });
-  } catch (error: any) {
+  } catch (error) {
     log.error('Error fetching config param', error);
     res.status(500).json({
       success: false,
       error: 'Kunde inte hämta konfigurationsparameter',
-      details: error.message,
+      details: getErrorMessage(error),
     });
   }
 });
@@ -1318,11 +1325,11 @@ app.put('/api/admin/config/:key', requireAdminPassword, async (req: Request, res
       message: `Konfiguration uppdaterad: ${key} = ${numValue}`,
       param: param,
     });
-  } catch (error: any) {
+  } catch (error) {
     log.error('Error updating config', error);
     res.status(400).json({
       success: false,
-      error: error.message || 'Kunde inte uppdatera konfiguration',
+      error: getErrorMessage(error) || 'Kunde inte uppdatera konfiguration',
     });
   }
 });
@@ -1333,7 +1340,7 @@ app.put('/api/admin/config/:key', requireAdminPassword, async (req: Request, res
  */
 app.post('/api/admin/config/batch', requireAdminPassword, async (req: Request, res: Response) => {
   try {
-    const { updateAlgorithmConfigValue, getAlgorithmConfig } = await import('./supabase');
+    const { updateAlgorithmConfigValue } = await import('./supabase');
     const { updates } = req.body;
     
     if (!updates || !Array.isArray(updates)) {
@@ -1355,8 +1362,8 @@ app.post('/api/admin/config/batch', requireAdminPassword, async (req: Request, r
         
         await updateAlgorithmConfigValue(update.key, numValue);
         results.push({ key: update.key, success: true });
-      } catch (err: any) {
-        results.push({ key: update.key, success: false, error: err.message });
+      } catch (err) {
+        results.push({ key: update.key, success: false, error: getErrorMessage(err) });
       }
     }
     
@@ -1368,12 +1375,12 @@ app.post('/api/admin/config/batch', requireAdminPassword, async (req: Request, r
       message: `${successCount} av ${updates.length} uppdateringar lyckades`,
       results: results,
     });
-  } catch (error: any) {
+  } catch (error) {
     log.error('Error batch updating config', error);
     res.status(500).json({
       success: false,
       error: 'Kunde inte uppdatera konfiguration',
-      details: error.message,
+      details: getErrorMessage(error),
     });
   }
 });
@@ -1391,12 +1398,12 @@ app.delete('/api/admin/config/legacy-engine', requireAdminPassword, async (req: 
       message: `Tog bort ${deletedCount} legacy motorval-konfigurationer`,
       deletedKeys: ['USE_V5', 'USE_V6', 'USE_V7'].slice(0, deletedCount),
     });
-  } catch (error: any) {
+  } catch (error) {
     log.error('Error deleting legacy engine config', error);
     res.status(500).json({
       success: false,
       error: 'Kunde inte ta bort legacy konfiguration',
-      details: error.message,
+      details: getErrorMessage(error),
     });
   }
 });

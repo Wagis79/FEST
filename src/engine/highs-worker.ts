@@ -38,7 +38,16 @@ interface SolveResponse {
   message?: string;
 }
 
-let highs: any = null;
+/** HiGHS solver interface */
+interface HighsSolver {
+  solve(lp: string): {
+    Status: string;
+    Columns: Record<string, { Primal: number }>;
+    ObjectiveValue: number;
+  };
+}
+
+let highs: HighsSolver | null = null;
 let solveCount = 0;
 const MAX_SOLVES_BEFORE_EXIT = 3; // Avsluta efter 3 solves - balans mellan stabilitet och 3 strategier
 
@@ -48,17 +57,18 @@ async function initHiGHS(): Promise<void> {
   try {
     const highsModule = await import('highs');
     const loader = highsModule.default || highsModule;
-    highs = await loader({});
+    highs = await loader({}) as HighsSolver;
     console.error('[worker] HiGHS initialized'); // stderr för debug
-  } catch (e: any) {
-    console.error('[worker] Failed to init HiGHS:', e.message);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error('[worker] Failed to init HiGHS:', msg);
     process.exit(1);
   }
 }
 
 function solve(lp: string): SolveResponse {
   try {
-    const result = highs.solve(lp);
+    const result = highs!.solve(lp);
     solveCount++;
     
     return {
@@ -67,10 +77,11 @@ function solve(lp: string): SolveResponse {
       columns: result.Columns,
       objectiveValue: result.ObjectiveValue,
     };
-  } catch (e: any) {
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
     return {
       type: 'error',
-      message: e.message || String(e),
+      message: msg,
     };
   }
 }
@@ -101,10 +112,11 @@ async function main(): Promise<void> {
           process.exit(0);
         }
       }
-    } catch (e: any) {
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
       const errorResponse: SolveResponse = {
         type: 'error',
-        message: `Parse error: ${e.message}`,
+        message: `Parse error: ${msg}`,
       };
       console.log(JSON.stringify(errorResponse));
     }

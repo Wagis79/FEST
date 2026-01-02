@@ -45,6 +45,7 @@ import type { Product } from '../models/Product';
 import type { NutrientNeed } from '../models/NutrientNeed';
 import type { Solution } from '../models/Solution';
 import type { HighsResult } from './highs-pool';
+import type { Highs, HighsSolution } from 'highs';
 import { getHighsPool } from './highs-pool';
 import log from '../utils/logger';
 
@@ -225,7 +226,7 @@ async function solveLPViaPool(lp: string): Promise<HighsResult | null> {
       const result = await workerPool.solve(lp);
       consecutivePoolErrors = 0; // Återställ vid lyckat anrop
       return result;
-    } catch (e: any) {
+    } catch (e) {
       consecutivePoolErrors++;
       const isLastAttempt = attempt === maxRetries;
       
@@ -235,7 +236,7 @@ async function solveLPViaPool(lp: string): Promise<HighsResult | null> {
         continue;
       }
       
-      log.error(`Worker pool error after ${maxRetries} retries`, e as Error);
+      log.error(`Worker pool error after ${maxRetries} retries`, e instanceof Error ? e : new Error(String(e)));
       return null;
     }
   }
@@ -251,7 +252,7 @@ function shouldUseFallback(): boolean {
 }
 
 // Fallback-variabler för inline HiGHS (används om pool inte fungerar)
-let cachedHighs: any = null;
+let cachedHighs: Highs | null = null;
 let highsInstanceCounter = 0;
 let highsSolveCount = 0;
 const MAX_SOLVES_BEFORE_RESET = 50;
@@ -259,7 +260,7 @@ const MAX_SOLVES_BEFORE_RESET = 50;
 /**
  * Hämta HiGHS solver - fallback för inline-mode
  */
-async function getHighsSolver(forceNew: boolean = false): Promise<any> {
+async function getHighsSolver(forceNew: boolean = false): Promise<Highs> {
   if (forceNew || highsSolveCount >= MAX_SOLVES_BEFORE_RESET) {
     if (cachedHighs) {
       log.debug(`Resetting HiGHS (${highsSolveCount} solves, forceNew=${forceNew})`);
@@ -590,7 +591,7 @@ function solveSingleNutrient(
  * - y_i = 1 för tvingade produkter
  */
 async function solveMILP(
-  highs: any,
+  highs: Highs,
   products: PreparedProduct[],
   targets: NutrientNeed,
   mustFlags: { mustN: boolean; mustP: boolean; mustK: boolean; mustS: boolean },
@@ -612,11 +613,12 @@ async function solveMILP(
         highs, products, targets, mustFlags, maxProducts, minDose, maxDose, 
         nToleranceKg, noGoodCuts, config, requiredProductIndices
       );
-    } catch (e: any) {
-      lastError = e;
-      const isWasmError = e?.message?.includes('WASM') || 
-                          e?.message?.includes('null function') || 
-                          e?.message?.includes('Aborted');
+    } catch (e) {
+      lastError = e instanceof Error ? e : new Error(String(e));
+      const msg = lastError.message;
+      const isWasmError = msg.includes('WASM') || 
+                          msg.includes('null function') || 
+                          msg.includes('Aborted');
       
       if (isWasmError && attempt < maxRetries) {
         log.debug(`HiGHS WASM error, retrying (${attempt + 1}/${maxRetries})...`);
@@ -624,12 +626,12 @@ async function solveMILP(
         continue;
       }
       
-      log.error('HiGHS solve error', e as Error);
+      log.error('HiGHS solve error', lastError);
       return null;
     }
   }
   
-  log.error(`HiGHS failed after ${maxRetries} attempts`, lastError as Error);
+  log.error(`HiGHS failed after ${maxRetries} attempts`, lastError);
   return null;
 }
 
@@ -637,7 +639,7 @@ async function solveMILP(
  * Intern: Lös MILP-problem
  */
 async function solveMILPCore(
-  highs: any,
+  highs: Highs,
   products: PreparedProduct[],
   targets: NutrientNeed,
   mustFlags: { mustN: boolean; mustP: boolean; mustK: boolean; mustS: boolean },
@@ -792,7 +794,7 @@ async function solveMILPCore(
   }
 
   // Lös med HiGHS
-  let result: any;
+  let result: HighsSolution | { Status: string; Columns: Record<string, { Primal: number }>; ObjectiveValue: number };
   
   // Använd worker pool om aktiverat och inte för många fel
   const usePool = USE_WORKER_POOL && workerPool && !shouldUseFallback();
@@ -808,7 +810,7 @@ async function solveMILPCore(
     result = {
       Status: poolResult.status,
       Columns: poolResult.columns,
-      ObjectiveValue: poolResult.objectiveValue,
+      ObjectiveValue: poolResult.objectiveValue ?? 0,
     };
   } else {
     // Fallback: direkt HiGHS (kan krascha WASM men snabbare)
@@ -818,8 +820,8 @@ async function solveMILPCore(
     try {
       result = highs.solve(lp);
       incrementSolveCount();
-    } catch (wasmError: any) {
-      log.error('HiGHS WASM error during solve', wasmError as Error);
+    } catch (wasmError) {
+      log.error('HiGHS WASM error during solve', wasmError instanceof Error ? wasmError : new Error(String(wasmError)));
       resetHighsOnError();
       throw wasmError; // Låt caller hantera retry
     }
@@ -1123,7 +1125,7 @@ export async function optimizeV7(
             requiredProductIndices
           );
           break; // Lyckades, avbryt retry-loop
-        } catch (wasmError: any) {
+        } catch {
           retryCount++;
           if (retryCount <= maxRetries) {
             log.debug(`WASM error, retry ${retryCount}/${maxRetries} with fresh HiGHS instance...`);
@@ -1178,7 +1180,7 @@ export async function optimizeV7(
           minDoseKgHa, maxDoseKgHa, usedNTolerance, noGoods, config,
           requiredProductIndices
         );
-      } catch (e) {
+      } catch {
         if (retry === 0) {
           log.debug('WASM error in strategy solve, retrying...');
           highs = await getHighsSolver(true);

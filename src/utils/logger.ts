@@ -46,26 +46,29 @@ const logger = winston.createLogger({
   ],
 });
 
+/** Typ för log-metadata */
+type LogMeta = Record<string, unknown>;
+
 // Convenience methods med emoji för visuell feedback i dev
 export const log = {
   /**
    * Informationsmeddelanden
    */
-  info: (message: string, meta?: Record<string, any>) => {
+  info: (message: string, meta?: LogMeta) => {
     logger.info(message, meta);
   },
 
   /**
    * Varningar
    */
-  warn: (message: string, meta?: Record<string, any>) => {
+  warn: (message: string, meta?: LogMeta) => {
     logger.warn(message, meta);
   },
 
   /**
    * Fel
    */
-  error: (message: string, error?: Error | unknown, meta?: Record<string, any>) => {
+  error: (message: string, error?: Error | unknown, meta?: LogMeta) => {
     const errorMeta = error instanceof Error 
       ? { error: error.message, stack: error.stack, ...meta }
       : { error: String(error), ...meta };
@@ -75,7 +78,7 @@ export const log = {
   /**
    * Debug (visas bara om LOG_LEVEL=debug)
    */
-  debug: (message: string, meta?: Record<string, any>) => {
+  debug: (message: string, meta?: LogMeta) => {
     logger.debug(message, meta);
   },
 
@@ -89,7 +92,7 @@ export const log = {
   /**
    * API request logging
    */
-  request: (method: string, path: string, meta?: Record<string, any>) => {
+  request: (method: string, path: string, meta?: LogMeta) => {
     logger.info(`📥 ${method} ${path}`, { type: 'request', ...meta });
   },
 
@@ -108,21 +111,21 @@ export const log = {
   /**
    * Optimization-specifik logging
    */
-  optimize: (message: string, meta?: Record<string, any>) => {
+  optimize: (message: string, meta?: LogMeta) => {
     logger.info(`⚙️ ${message}`, { type: 'optimization', ...meta });
   },
 
   /**
    * Database operations
    */
-  db: (message: string, meta?: Record<string, any>) => {
+  db: (message: string, meta?: LogMeta) => {
     logger.debug(`🗄️ ${message}`, { type: 'database', ...meta });
   },
 
   /**
    * Security events
    */
-  security: (message: string, meta?: Record<string, any>) => {
+  security: (message: string, meta?: LogMeta) => {
     logger.warn(`🔐 ${message}`, { type: 'security', ...meta });
   },
 };

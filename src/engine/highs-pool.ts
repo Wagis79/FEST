@@ -18,7 +18,7 @@
  */
 
 import type { ChildProcess } from 'child_process';
-import { spawn, fork } from 'child_process';
+import { spawn } from 'child_process';
 import { EventEmitter } from 'events';
 import * as path from 'path';
 import * as readline from 'readline';
@@ -142,7 +142,7 @@ class HighsPool extends EventEmitter {
       log.warn(`Worker ${proc.pid} exited`, { code, signal });
       
       // Reject alla pending requests
-      for (const [id, pending] of worker.pendingRequests) {
+      for (const [_id, pending] of worker.pendingRequests) {
         clearTimeout(pending.timeout);
         pending.reject(new Error(`Worker crashed (code=${code})`));
       }
