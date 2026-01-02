@@ -107,6 +107,7 @@ const Admin = {
               <th class="sortable" onclick="Admin.sortBy('Artikelnr')">Artikelnr</th>
               <th class="sortable" onclick="Admin.sortBy('Produkt')">Produkt</th>
               <th class="sortable" onclick="Admin.sortBy('active')">Status</th>
+              <th class="sortable" onclick="Admin.sortBy('Optimeringsbar')">Opt.</th>
               <th class="sortable" onclick="Admin.sortBy('N')">N</th>
               <th class="sortable" onclick="Admin.sortBy('P')">P</th>
               <th class="sortable" onclick="Admin.sortBy('K')">K</th>
@@ -140,11 +141,17 @@ const Admin = {
       ? '<span class="status-badge status-active">✅ Aktiv</span>'
       : '<span class="status-badge status-inactive">❌ Inaktiv</span>';
     
+    const isOptimizable = product.Optimeringsbar === 'Ja';
+    const optBadge = isOptimizable
+      ? '<span class="status-badge status-active">✅</span>'
+      : '<span class="status-badge status-inactive">❌</span>';
+    
     return `
       <tr${!isActive ? ' style="opacity: 0.6;"' : ''}>
         <td>${product.Artikelnr || '-'}</td>
         <td><strong>${product.Produkt || '-'}</strong></td>
         <td>${statusBadge}</td>
+        <td>${optBadge}</td>
         <td>${product.N || '-'}</td>
         <td>${product.P || '-'}</td>
         <td>${product.K || '-'}</td>
@@ -171,6 +178,8 @@ const Admin = {
   updateStats() {
     const activeCount = this.products.filter(p => p.active !== false).length;
     const inactiveCount = this.products.length - activeCount;
+    const optimizableCount = this.products.filter(p => p.Optimeringsbar === 'Ja').length;
+    const nonOptimizableCount = this.products.length - optimizableCount;
     
     const statsHTML = `
       <div class="stat-card">
@@ -180,6 +189,10 @@ const Admin = {
       <div class="stat-card" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%);">
         <div class="stat-number">${activeCount}</div>
         <div class="stat-label">Aktiva produkter</div>
+      </div>
+      <div class="stat-card" style="background: linear-gradient(135deg, #17a2b8 0%, #6f42c1 100%);">
+        <div class="stat-number">${optimizableCount}</div>
+        <div class="stat-label">Optimeringsbara</div>
       </div>
       <div class="stat-card" style="background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);">
         <div class="stat-number">${inactiveCount}</div>
@@ -289,7 +302,7 @@ const Admin = {
     document.getElementById('pris').value = product.Pris || '';
     document.getElementById('enhet').value = product.Enhet || 'KG';
     document.getElementById('produktklass').value = product.Produktklass || '';
-    document.getElementById('optimeringsbar').value = product.Optimeringsbar || 'Ja';
+    document.getElementById('optimeringsbar').value = product.Optimeringsbar === 'Ja' ? 'Ja' : 'Nej';
     document.getElementById('analysstatus').value = product.Analysstatus || '';
     document.getElementById('pallantal').value = product.PallAntal || '';
     document.getElementById('idx').value = product.idx || '';
