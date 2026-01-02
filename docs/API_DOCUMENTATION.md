@@ -610,6 +610,7 @@ var data = await response.Content.ReadFromJsonAsync<RecommendResponse>();
 | 400 | Bad Request - Ogiltig input |
 | 403 | Forbidden - Felaktigt admin-lösenord |
 | 404 | Not Found - Resurs hittades inte |
+| 429 | Too Many Requests - Rate limit överskridet |
 | 500 | Internal Server Error - Serverfel |
 | 503 | Service Unavailable - Databasen är otillgänglig |
 
@@ -617,7 +618,35 @@ var data = await response.Content.ReadFromJsonAsync<RecommendResponse>();
 
 ## Rate Limiting
 
-> ⚠️ **Observera:** Rate limiting är inte implementerat i nuvarande version. Vid hög belastning rekommenderas att implementera rate limiting på klientsidan eller via en API-gateway.
+API:et har inbyggd rate limiting för att skydda mot överbelastning:
+
+| Endpoint | Gräns | Tidsfönster |
+|----------|-------|-------------|
+| `/api/*` (generell) | 100 requests | 15 minuter |
+| `/api/recommend` | 10 requests | 1 minut |
+| `/api/optimize-v7` | 10 requests | 1 minut |
+| `/api/admin/*` | 30 requests | 15 minuter |
+| `/health` | Obegränsat | - |
+
+### Rate Limit Headers
+
+Responses inkluderar standard rate limit headers:
+
+```
+RateLimit-Limit: 100
+RateLimit-Remaining: 95
+RateLimit-Reset: 892
+```
+
+### Vid överskridning (HTTP 429)
+
+```json
+{
+  "success": false,
+  "error": "För många förfrågningar. Försök igen om 15 minuter.",
+  "code": "RATE_LIMIT_EXCEEDED"
+}
+```
 
 ---
 

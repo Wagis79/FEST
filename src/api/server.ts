@@ -6,6 +6,8 @@
 
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import path from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
@@ -160,9 +162,86 @@ function blockExternalAccess(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
-// Global Middleware
+// =============================================================================
+// RATE LIMITING
+// =============================================================================
+
+// General API rate limiter (more permissive)
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minuter
+  max: 100, // max 100 requests per 15 min per IP
+  message: {
+    success: false,
+    error: 'För många förfrågningar. Försök igen om 15 minuter.',
+    code: 'RATE_LIMIT_EXCEEDED'
+  },
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  skip: (req) => {
+    // Skip rate limiting for health checks
+    return req.path === '/health';
+  }
+});
+
+// Stricter rate limiter for expensive operations (optimization)
+const optimizeLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minut
+  max: 10, // max 10 optimeringar per minut per IP
+  message: {
+    success: false,
+    error: 'För många optimeringsförfrågningar. Försök igen om en minut.',
+    code: 'OPTIMIZE_RATE_LIMIT_EXCEEDED'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Admin rate limiter (prevent brute force)
+const adminLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minuter
+  max: 30, // max 30 admin requests per 15 min per IP
+  message: {
+    success: false,
+    error: 'För många admin-förfrågningar. Försök igen senare.',
+    code: 'ADMIN_RATE_LIMIT_EXCEEDED'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// =============================================================================
+// GLOBAL MIDDLEWARE
+// =============================================================================
+
+// Security headers with Helmet
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // Needed for Swagger UI
+      styleSrc: ["'self'", "'unsafe-inline'"], // Needed for Swagger UI
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false, // Allow embedding for Swagger UI
+}));
+
+// CORS
 app.use(cors());
+
+// JSON body parser
 app.use(express.json());
+
+// Apply general rate limiter to all API routes
+app.use('/api/', apiLimiter);
+
+// Apply stricter rate limiter to optimization endpoints
+app.use('/api/recommend', optimizeLimiter);
+app.use('/api/optimize-v7', optimizeLimiter);
+
+// Apply admin rate limiter
+app.use('/api/admin/', adminLimiter);
 
 // Swagger UI - API Documentation
 // Using separate routers to avoid conflicts between multiple swagger instances

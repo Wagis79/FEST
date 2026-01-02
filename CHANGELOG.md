@@ -2,6 +2,32 @@
 
 Alla viktiga ändringar i projektet dokumenteras här.
 
+## [2.7.3] - 2026-01-02
+
+### 🔒 Säkerhetsförbättringar
+
+#### Rate Limiting
+- **API Rate Limiting** - Skydd mot överbelastning (DoS)
+  - Generell API: 100 requests/15 min per IP
+  - Optimering (`/api/recommend`, `/api/optimize-v7`): 10 requests/min per IP
+  - Admin (`/api/admin/*`): 30 requests/15 min per IP
+  - Health-endpoint undantagen från rate limiting
+  - Standard `RateLimit-*` headers inkluderade i responses
+
+#### Säkerhetsheaders (Helmet)
+- **Helmet middleware** - Automatiska säkerhetsheaders
+  - `X-Content-Type-Options: nosniff` - Förhindrar MIME-sniffing
+  - `X-Frame-Options: SAMEORIGIN` - Clickjacking-skydd
+  - `X-XSS-Protection: 0` - Legacy XSS-filter (modern CSP istället)
+  - `Strict-Transport-Security` - HSTS för HTTPS
+  - `Content-Security-Policy` - CSP anpassad för Swagger UI
+
+#### Nya dependencies
+- `express-rate-limit` ^7.x
+- `helmet` ^8.x
+
+---
+
 ## [2.7.2] - 2026-01-02
 
 ### 🧪 Utökad testsvit + CI/CD

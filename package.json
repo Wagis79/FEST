@@ -1,6 +1,6 @@
 {
   "name": "fest-nutrient-decision-support",
-  "version": "2.7.2",
+  "version": "2.7.3",
   "description": "Intelligent beslutsstöd för gödselrekommendationer med inköpslista och balanshantering",
   "scripts": {
     "start": "node --max-old-space-size=4096 node_modules/tsx/dist/cli.mjs src/api/start.ts",
@@ -39,6 +39,8 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.2.1",
+    "helmet": "^8.1.0",
     "highs": "^1.8.0",
     "swagger-ui-express": "^5.0.1",
     "yaml": "^2.8.2"

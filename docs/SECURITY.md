@@ -108,25 +108,61 @@ ADMIN_PASSWORD=change_this_to_a_strong_password_123!
 
 ---
 
-## 5. Produktions-checklist
+## 5. Rate Limiting
+
+Servern har inbyggd rate limiting för att skydda mot överbelastning:
+
+| Endpoint | Gräns | Tidsfönster |
+|----------|-------|-------------|
+| `/api/*` (generell) | 100 requests | 15 minuter |
+| `/api/recommend` | 10 requests | 1 minut |
+| `/api/optimize-v7` | 10 requests | 1 minut |
+| `/api/admin/*` | 30 requests | 15 minuter |
+| `/health` | Obegränsat | - |
+
+### Rate Limit Headers
+Responses inkluderar standard rate limit headers:
+- `RateLimit-Limit` - Max antal requests
+- `RateLimit-Remaining` - Återstående requests
+- `RateLimit-Reset` - Tid till reset (sekunder)
+
+### Vid överskridning
+HTTP 429 returneras med:
+```json
+{
+  "success": false,
+  "error": "För många förfrågningar. Försök igen om X minuter.",
+  "code": "RATE_LIMIT_EXCEEDED"
+}
+```
+
+---
+
+## 6. Produktions-checklist
 
 ### Före deployment:
 
-- [ ] `.env` är i `.gitignore`
-- [ ] Starkt lösenord i `ADMIN_PASSWORD`
+- [x] `.env` är i `.gitignore`
+- [x] Starkt lösenord i `ADMIN_PASSWORD`
+- [x] Rate limiting aktiverat
+- [x] Säkerhetsheaders (Helmet) aktiverat
 - [ ] HTTPS aktiverat
 - [ ] Supabase RLS aktiverat
 - [ ] CORS origins konfigurerade
 - [ ] Daily backups aktiverade
 
-### Säkerhetsheaders (ingår automatiskt):
-- `X-Frame-Options: DENY` - Förhindrar clickjacking
+### Säkerhetsheaders (via Helmet):
+- `X-Frame-Options: SAMEORIGIN` - Förhindrar clickjacking
 - `X-Content-Type-Options: nosniff` - Förhindrar MIME-sniffing
-- `X-XSS-Protection: 1; mode=block` - XSS-filter
+- `Strict-Transport-Security` - HSTS för HTTPS
+- `Content-Security-Policy` - CSP-policy
+- `X-DNS-Prefetch-Control: off` - DNS prefetch avstängd
+- `X-Download-Options: noopen` - IE download-skydd
+- `X-Permitted-Cross-Domain-Policies: none` - Cross-domain policy
 
 ---
 
-## 6. Vid säkerhetsincident
+## 7. Vid säkerhetsincident
 
 **Omedelbart:**
 1. Ändra `ADMIN_PASSWORD` i `.env`
@@ -148,8 +184,9 @@ ADMIN_PASSWORD=change_this_to_a_strong_password_123!
 | "Kunde inte hämta produkter" | Kontrollera Supabase-credentials |
 | Admin-panelen laddar inte | Verifiera att servern körs på port 3000 |
 | 403 på API-anrop | Verifiera att `x-admin-password` header skickas |
+| 429 Too Many Requests | Vänta tills rate limit reset eller kontakta admin |
 
 ---
 
-**Version:** 2.2.0  
-**Uppdaterad:** December 2025
+**Version:** 2.7.3  
+**Uppdaterad:** Januari 2026
