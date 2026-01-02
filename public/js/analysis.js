@@ -59,8 +59,10 @@ async function loadAnalysis() {
         }
 
         const response = await fetch('/api/admin/product-analysis', {
+            credentials: 'same-origin',
             headers: {
-                'x-admin-password': adminPassword
+                'x-admin-password': adminPassword,
+                'X-Requested-With': 'XMLHttpRequest'
             }
         });
 

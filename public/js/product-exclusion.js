@@ -232,7 +232,10 @@ const ProductExclusion = {
         
         try {
             // Hämta produkter från API
-            const response = await fetch('/api/products');
+            const response = await fetch('/api/products', {
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
             const data = await response.json();
             
             if (data.success && data.products) {

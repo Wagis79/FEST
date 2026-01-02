@@ -13,7 +13,10 @@ const API = {
      */
     async fetchCrops() {
         return ErrorHandler.withErrorHandling(async () => {
-            const response = await fetch('/api/crops');
+            const response = await fetch('/api/crops', {
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
             const data = await response.json();
             if (data.success) {
                 AppState.crops = data.crops;
@@ -31,7 +34,10 @@ const API = {
      */
     async fetchProducts() {
         return ErrorHandler.withErrorHandling(async () => {
-            const response = await fetch('/api/products');
+            const response = await fetch('/api/products', {
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
             const data = await response.json();
             if (data.success) {
                 AppState.products = data.products;
@@ -51,7 +57,11 @@ const API = {
         return ErrorHandler.withErrorHandling(async () => {
             const response = await fetch('/api/calculate-need', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
                 body: JSON.stringify({ cropId, yieldTonPerHa })
             });
             return await response.json();
@@ -82,7 +92,11 @@ const API = {
             
             const response = await fetch('/api/recommend', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
                 body: JSON.stringify(requestBody)
             });
             

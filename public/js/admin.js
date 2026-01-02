@@ -43,13 +43,15 @@ const Admin = {
   getHeaders() {
     return {
       'Content-Type': 'application/json',
-      'X-Admin-Password': this.password
+      'X-Admin-Password': this.password,
+      'X-Requested-With': 'XMLHttpRequest'
     };
   },
 
   async loadProducts() {
     try {
       const response = await fetch('/api/admin/products', {
+        credentials: 'same-origin',
         headers: this.getHeaders()
       });
       

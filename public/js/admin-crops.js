@@ -43,13 +43,15 @@ const CropsAdmin = {
   getHeaders() {
     return {
       'Content-Type': 'application/json',
-      'X-Admin-Password': this.password
+      'X-Admin-Password': this.password,
+      'X-Requested-With': 'XMLHttpRequest'
     };
   },
 
   async loadCrops() {
     try {
       const response = await fetch('/api/admin/crops', {
+        credentials: 'same-origin',
         headers: this.getHeaders()
       });
       

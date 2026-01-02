@@ -105,10 +105,16 @@ function requireApiKey(req: Request, res: Response, next: NextFunction) {
 
   // Check if request is from same origin (our frontend)
   // Same-origin requests typically have Referer header matching our host
-  // or come from browser without X-API-Key header and with typical browser headers
+  // or come with X-Requested-With: XMLHttpRequest header from our JS
   const referer = req.headers['referer'] as string;
   const origin = req.headers['origin'] as string;
   const host = req.headers['host'] as string;
+  const xRequestedWith = req.headers['x-requested-with'] as string;
+  
+  // If X-Requested-With header is set, it's from our frontend JS
+  if (xRequestedWith === 'XMLHttpRequest') {
+    return next();
+  }
   
   // If Referer or Origin matches our host, it's a same-origin request - allow it
   if (referer && host && referer.includes(host)) {
@@ -233,6 +239,7 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // Needed for Swagger UI
+      scriptSrcAttr: ["'unsafe-inline'"], // Allow inline event handlers (onclick, etc.)
       styleSrc: ["'self'", "'unsafe-inline'"], // Needed for Swagger UI
       imgSrc: ["'self'", "data:", "https:"],
       connectSrc: ["'self'"],
