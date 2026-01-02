@@ -370,6 +370,23 @@ app.post('/api/recommend', requireApiKey, validateBody(RecommendRequestSchema), 
 
   // Hämta produkter från Supabase (behovsstyrt urval för bättre träffbild)
   let products = await getProductsForRecommendation(need as NutrientNeed, strategy);
+  
+  // Se till att tvingade produkter alltid är med i urvalet
+  if (requiredProductIds && Array.isArray(requiredProductIds) && requiredProductIds.length > 0) {
+    const productIdSet = new Set(products.map(p => p.id));
+    const missingRequired = requiredProductIds.filter(id => !productIdSet.has(id));
+    
+    if (missingRequired.length > 0) {
+      // Hämta alla produkter för att kunna lägga till de som saknas
+      const allProducts = await getAllProductsForRecommendation();
+      const missingProducts = allProducts.filter(p => missingRequired.includes(p.id));
+      products = [...products, ...missingProducts];
+      log.debug('Lade till tvingade produkter som saknades i urvalet', { 
+        added: missingProducts.length, 
+        requested: missingRequired.length 
+      });
+    }
+  }
     
   // Filtrera bort användarexkluderade produkter
   if (excludedProductIds && Array.isArray(excludedProductIds) && excludedProductIds.length > 0) {

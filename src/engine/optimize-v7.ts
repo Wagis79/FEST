@@ -1006,8 +1006,9 @@ export async function optimizeV7(
 
   // ──────────────────────────────────────────────────────────────────────────
   // SINGLE NUTRIENT MODE (punkt 9)
+  // Hoppa över om det finns tvingade produkter - de kräver MILP-constraints
   // ──────────────────────────────────────────────────────────────────────────
-  if (activeCount === 1) {
+  if (activeCount === 1 && requiredProductIndices.length === 0) {
     const nutrient = activeNutrients[0];
     const target = nutrient === 'N' ? targetN : 
                    nutrient === 'P' ? targetP : 
