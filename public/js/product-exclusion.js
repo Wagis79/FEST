@@ -41,8 +41,6 @@ const ProductExclusion = {
         const requiredCount = AppState.requiredProductIds?.length || 0;
         const totalModified = excludedCount + requiredCount;
         
-        console.log('[ProductExclusion] updateButton() - excluded:', excludedCount, ', required:', requiredCount);
-        
         if (totalModified > 0) {
             btn.classList.add('has-exclusions');
             btn.setAttribute('data-excluded-count', totalModified);
@@ -51,13 +49,10 @@ const ProductExclusion = {
             if (excludedCount > 0) parts.push(`${excludedCount} exkluderade`);
             if (requiredCount > 0) parts.push(`${requiredCount} tvingade`);
             btn.setAttribute('data-tooltip', parts.join(', '));
-            
-            console.log('[ProductExclusion] ✅ Knapp uppdaterad med markering');
         } else {
             btn.classList.remove('has-exclusions');
             btn.removeAttribute('data-excluded-count');
             btn.removeAttribute('data-tooltip');
-            console.log('[ProductExclusion] Knapp återställd (inga modifieringar)');
         }
     },
 
@@ -67,8 +62,6 @@ const ProductExclusion = {
      * @param status - 'normal' | 'excluded' | 'required'
      */
     setStatus(productId, status) {
-        console.log(`[ProductExclusion] setStatus() - productId: ${productId}, status: ${status}`);
-        
         // Initialisera arrayer om de inte finns
         if (!AppState.excludedProductIds) AppState.excludedProductIds = [];
         if (!AppState.requiredProductIds) AppState.requiredProductIds = [];
@@ -97,9 +90,6 @@ const ProductExclusion = {
         
         // Uppdatera footer-text och reset-knapp
         this.updateModalFooter();
-        
-        console.log(`[ProductExclusion] ✅ Produkt ${productId} satt till ${status}`);
-        console.log('[ProductExclusion] Exkluderade:', AppState.excludedProductIds.length, ', Tvingade:', AppState.requiredProductIds.length);
     },
 
     /**

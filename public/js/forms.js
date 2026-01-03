@@ -233,14 +233,10 @@ const Forms = {
      * Hämta rekommendationer från API
      */
     async fetchRecommendations(need, strategy, maxProducts, topN, requiredNutrients) {
-        console.log('[Forms] fetchRecommendations() START');
-        
         try {
             const results = document.getElementById('results');
             const loading = document.getElementById('loading');
             const errorDiv = document.getElementById('error');
-            
-            console.log('[Forms] DOM elements:', { results: !!results, loading: !!loading, errorDiv: !!errorDiv });
 
             // 1. RENSA gamla resultat och fel DIREKT (bara solutionsList, inte hela results)
             const solutionsList = document.getElementById('solutionsList');
@@ -250,58 +246,43 @@ const Forms = {
             AppState.currentResultsData = null;
 
             // Beräkna antal kombinationer baserat på relevanta produkter
-            // (ej exkluderade + har minst ett av de valda näringsämnena)
             const numProducts = this.countRelevantProducts(requiredNutrients);
             const combinations = this.calculateCombinations(numProducts, maxProducts);
-            const excludedCount = AppState.excludedProductIds ? AppState.excludedProductIds.length : 0;
-            console.log(`[Loader] ${numProducts} relevanta produkter (${excludedCount} exkluderade, filtrerat på ${requiredNutrients?.join(',') || 'alla'}), max ${maxProducts} = ${combinations} kombinationer`);
 
-            // 2. Återställ loader och starta intro-animation (text + spinner)
+            // 2. Återställ loader och starta intro-animation
             if (typeof spreaderLoader !== 'undefined' && spreaderLoader) {
-                console.log('[Forms] Anropar spreaderLoader.reset()...');
                 try {
                     spreaderLoader.reset();
-                    console.log('[Forms] reset() OK');
                 } catch (e) {
                     console.error('[Forms] reset() FEL:', e);
                 }
                 
-                console.log('[Forms] Anropar spreaderLoader.showIntro()...');
                 try {
                     spreaderLoader.showIntro(combinations);
-                    console.log('[Forms] showIntro() OK');
                 } catch (e) {
                     console.error('[Forms] showIntro() FEL:', e);
                 }
-            } else {
-                console.log('[Forms] spreaderLoader ej definierad');
             }
             
             if (loading) loading.classList.add('show');
 
             // 3. Kör API-anrop
-            console.log('[Forms] Startar API-anrop...');
             const apiPromise = API.getRecommendations(need, strategy, maxProducts, topN, requiredNutrients);
             
             // Vänta på API-svar
             const data = await apiPromise;
-            console.log('[Forms] API-svar mottaget:', data ? 'OK' : 'null');
             
             // 4. Vänta tills intro är klar (minst 3 sek från start)
             if (typeof spreaderLoader !== 'undefined' && spreaderLoader) {
-                console.log('[Forms] Väntar på intro...');
                 try {
                     await spreaderLoader.waitForIntro();
-                    console.log('[Forms] waitForIntro() OK');
                 } catch (e) {
                     console.error('[Forms] waitForIntro() FEL:', e);
                 }
             }
             
             // 5. Visa resultat (bakom blur)
-            console.log('[Forms] Visar resultat...');
             this.displayResults(data);
-            console.log('[Forms] displayResults() OK');
             
             // Scrolla så resultat #1 ligger längst upp
             if (results) {
@@ -310,10 +291,8 @@ const Forms = {
             
             // 6. Starta spreader-animation
             if (typeof spreaderLoader !== 'undefined' && spreaderLoader) {
-                console.log('[Forms] Startar spreader...');
                 try {
                     spreaderLoader.startSpreader();
-                    console.log('[Forms] startSpreader() OK');
                 } catch (e) {
                     console.error('[Forms] startSpreader() FEL:', e);
                 }
@@ -322,21 +301,17 @@ const Forms = {
             // 7. Vänta på hide
             if (loading) loading.classList.remove('show');
             if (typeof spreaderLoader !== 'undefined' && spreaderLoader) {
-                console.log('[Forms] Väntar på hide...');
                 try {
                     await spreaderLoader.hide();
-                    console.log('[Forms] hide() OK');
                 } catch (e) {
                     console.error('[Forms] hide() FEL:', e);
                 }
             }
             
-            console.log('[Forms] fetchRecommendations() KLAR');
             this.isCalculating = false;
             
         } catch (error) {
             console.error('[Forms] KRITISKT FEL i fetchRecommendations:', error);
-            console.error('[Forms] Stack:', error.stack);
             
             this.isCalculating = false;
             

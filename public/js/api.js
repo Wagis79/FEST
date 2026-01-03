@@ -54,7 +54,6 @@ const API = {
      * Beräkna näringsbehov från gröda
      */
     async calculateNeed(cropId, yieldTonPerHa) {
-        console.log('[API] calculateNeed called with:', { cropId, yieldTonPerHa });
         return ErrorHandler.withErrorHandling(async () => {
             const response = await fetch('/api/calculate-need', {
                 method: 'POST',
@@ -66,8 +65,6 @@ const API = {
                 body: JSON.stringify({ cropId, yieldTonPerHa })
             });
             
-            console.log('[API] calculateNeed response status:', response.status);
-            
             // Check content type before parsing
             const contentType = response.headers.get('content-type');
             if (!contentType || !contentType.includes('application/json')) {
@@ -75,7 +72,6 @@ const API = {
             }
             
             const data = await response.json();
-            console.log('[API] calculateNeed response data:', data);
             if (!response.ok) {
                 throw { ...data, status: response.status };
             }
@@ -91,9 +87,6 @@ const API = {
             // Inkludera exkluderade och tvingade produkter om det finns några
             const excludedProductIds = AppState.excludedProductIds || [];
             const requiredProductIds = AppState.requiredProductIds || [];
-            
-            console.log('[API] getRecommendations() anropad');
-            console.log('[API] Exkluderade:', excludedProductIds.length, 'Tvingade:', requiredProductIds.length);
             
             const requestBody = { 
                 need, 
