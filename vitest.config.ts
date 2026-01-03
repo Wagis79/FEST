@@ -20,11 +20,6 @@ export default defineConfig({
         'src/engine/highs-pool.ts',
         // Worker (IPC via stdin/stdout, tested via integration)
         'src/engine/highs-worker.ts',
-        // Refactored server (not yet in use)
-        'src/api/server-refactored.ts',
-        // Route/middleware modules (tested via server.test.ts integration)
-        'src/api/routes/**/*.ts',
-        'src/api/middleware/**/*.ts'
       ]
     },
     testTimeout: 30000, // HiGHS kan ta tid

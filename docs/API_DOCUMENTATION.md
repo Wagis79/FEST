@@ -1,6 +1,6 @@
 # FEST API Documentation
 
-**Version:** 2.8.2  
+**Version:** 2.8.5  
 **Produktion:** `https://fest-production-d1bb.up.railway.app`  
 **Lokal utveckling:** `http://localhost:3000`  
 **Content-Type:** `application/json`
