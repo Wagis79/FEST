@@ -211,6 +211,28 @@ const ProductExclusion = {
     },
 
     /**
+     * Lägg till event listeners för statusknapparna (CSP-kompatibelt)
+     * Ersätter inline onclick-attribut
+     */
+    attachStatusButtonListeners() {
+        const buttons = document.querySelectorAll('.status-btn[data-product-id]');
+        buttons.forEach(btn => {
+            // Ta bort eventuella befintliga listeners genom att klona
+            const newBtn = btn.cloneNode(true);
+            btn.parentNode.replaceChild(newBtn, btn);
+            
+            // Lägg till ny listener
+            newBtn.addEventListener('click', (e) => {
+                const productId = e.currentTarget.getAttribute('data-product-id');
+                if (productId) {
+                    this.cycleStatus(productId);
+                }
+            });
+        });
+        console.log(`✅ ${buttons.length} statusknapp-listeners registrerade`);
+    },
+
+    /**
      * Visa produktlista modal
      */
     async showModal() {
@@ -274,7 +296,6 @@ const ProductExclusion = {
                             <td class="product-status-cell">
                                 <button class="${btnClass}" 
                                         data-product-id="${p.id}"
-                                        onclick="ProductExclusion.cycleStatus('${p.id}')"
                                         title="${btnTitle}">
                                     ${btnText}
                                 </button>
@@ -288,6 +309,9 @@ const ProductExclusion = {
                         </tr>
                     `;
                 }).join('');
+                
+                // Lägg till event listeners för statusknapparna (CSP-kompatibelt)
+                this.attachStatusButtonListeners();
                 
                 // Uppdatera footer
                 this.updateModalFooter();
