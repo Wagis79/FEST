@@ -18,7 +18,7 @@ info:
     - **Extern (API-nyckel)**: `/api/recommend`, `/api/products`, `/api/crops`, `/api/calculate-need`
     - **Intern**: `/api/optimize-v7`
     - **Admin**: `/api/admin/*`
-  version: 2.8.4
+  version: 2.8.5
   contact:
     name: FEST Development Team
 

@@ -2,6 +2,23 @@
 
 Alla viktiga ändringar i projektet dokumenteras här.
 
+## [2.8.5] - 2026-01-03
+
+### 🚀 Railway Production Fix
+
+#### CORS & Proxy
+- **Trust proxy** - Lade till `app.set('trust proxy', 1)` för Railway/produktion
+- **Railway CORS** - Automatisk detection av `RAILWAY_PUBLIC_DOMAIN` miljövariabel
+- **Fallback CORS** - Tillåter alla `*.up.railway.app` domäner
+- **Rate-limiting fix** - Löste `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR` error
+
+#### Felsökning
+- Orsak: CORS blockerade requests från Railway-domänen
+- Orsak: Express litade inte på Railway's reverse proxy headers
+- Symptom: 500-fel vid API-anrop från webbläsare, curl fungerade
+
+---
+
 ## [2.8.4] - 2026-01-02
 
 ### 🔒 Säkerhet & Kodkvalitet

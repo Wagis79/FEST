@@ -52,6 +52,11 @@ dotenv.config();
 const app = express();
 const _PORT = process.env.PORT || 3000;
 
+// Trust proxy for Railway/production (needed for rate-limiting and X-Forwarded-For)
+if (process.env.NODE_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT) {
+  app.set('trust proxy', 1);
+}
+
 /** Helper to extract error message from unknown error */
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -264,6 +269,11 @@ const allowedOrigins = process.env.CORS_ALLOWED_ORIGINS
   ? process.env.CORS_ALLOWED_ORIGINS.split(',').map((origin) => origin.trim())
   : ['http://localhost:3000', 'http://localhost:5173', 'http://127.0.0.1:3000'];
 
+// Add Railway domain automatically if running on Railway
+if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+  allowedOrigins.push(`https://${process.env.RAILWAY_PUBLIC_DOMAIN}`);
+}
+
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
     // Tillåt requests utan origin (same-origin, server-to-server, Postman, etc.)
@@ -272,6 +282,10 @@ const corsOptions: cors.CorsOptions = {
     }
     // Kontrollera om origin finns i vitlistan
     if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+      return callback(null, true);
+    }
+    // I production, tillåt Railway domains
+    if (origin.endsWith('.up.railway.app')) {
       return callback(null, true);
     }
     // I development-läge, tillåt alla localhost-varianter
