@@ -650,8 +650,12 @@ app.get('/api/crops', requireApiKey, async (req: Request, res: Response) => {
 app.post('/api/calculate-need', requireApiKey, async (req: Request, res: Response) => {
   try {
     const { cropId, yieldTonPerHa, precropId } = req.body;
+    
+    // Debug logging
+    log.debug('calculate-need request', { cropId, yieldTonPerHa, precropId, body: req.body });
 
     if (!cropId || !yieldTonPerHa) {
+      log.warn('calculate-need missing params', { cropId, yieldTonPerHa });
       return res.status(400).json({
         success: false,
         error: 'cropId och yieldTonPerHa krävs',
@@ -699,10 +703,11 @@ app.post('/api/calculate-need', requireApiKey, async (req: Request, res: Respons
       } : null,
     });
   } catch (error) {
-    log.error('Error in /api/calculate-need', error);
+    log.error('Error in /api/calculate-need', { error, body: req.body });
     res.status(500).json({
       success: false,
       error: 'Serverfel vid beräkning av näringsbehov',
+      details: error instanceof Error ? error.message : String(error),
     });
   }
 });
