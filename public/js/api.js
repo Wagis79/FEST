@@ -64,7 +64,18 @@ const API = {
                 },
                 body: JSON.stringify({ cropId, yieldTonPerHa })
             });
-            return await response.json();
+            
+            // Check content type before parsing
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            if (!response.ok) {
+                throw { ...data, status: response.status };
+            }
+            return data;
         });
     },
 
