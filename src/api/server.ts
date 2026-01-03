@@ -347,8 +347,18 @@ try {
   log.warn('Could not load OpenAPI spec for Swagger UI', { error: err });
 }
 
-// Public static files
-app.use(express.static(path.join(__dirname, '../../public')));
+// Public static files with cache control
+app.use(express.static(path.join(__dirname, '../../public'), {
+  maxAge: process.env.NODE_ENV === 'production' ? '1h' : 0,
+  etag: true,
+  lastModified: true,
+  setHeaders: (res, filePath) => {
+    // Disable cache for JS files to ensure latest code
+    if (filePath.endsWith('.js') || filePath.endsWith('.css')) {
+      res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+    }
+  }
+}));
 
 // Serve index.html for root
 app.get('/', (req: Request, res: Response) => {
