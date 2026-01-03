@@ -26,9 +26,9 @@ class SpreaderLoader {
     this.showTimestamp = 0;
     this.tractorY = 0; // Traktorns Y-position för animation
     
-    // Load spreader image
+    // Load spreader image - TEST med traktor-spridare bild
     this.spreaderImage = new Image();
-    this.spreaderImage.src = '/spridare.png';
+    this.spreaderImage.src = '/traktor-spridare.png';  // Ändrad från /spridare.png
     this.imageLoaded = false;
     this.spreaderImage.onload = () => {
       this.imageLoaded = true;
@@ -521,10 +521,10 @@ class SpreaderLoader {
     const imgWidth = this.spreaderImage.width;
     const imgHeight = this.spreaderImage.height;
     
-    // Skala ner om bilden är för stor (max 300px bredd)
+    // Skala ner om bilden är för stor (max 240px bredd för traktor-bilden)
     let drawWidth = imgWidth;
     let drawHeight = imgHeight;
-    const maxWidth = 300;
+    const maxWidth = 240;  // Minskad från 300 till 240
     if (drawWidth > maxWidth) {
       const scale = maxWidth / drawWidth;
       drawWidth *= scale;
