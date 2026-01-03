@@ -264,7 +264,7 @@ const Forms = {
                 }
             }
             
-            if (loading) loading.classList.add('show');
+            // Den gamla loading-diven används inte längre - SpreaderLoader hanterar allt
 
             // 3. Kör API-anrop
             const apiPromise = API.getRecommendations(need, strategy, maxProducts, topN, requiredNutrients);
@@ -299,7 +299,6 @@ const Forms = {
             }
             
             // 7. Vänta på hide
-            if (loading) loading.classList.remove('show');
             if (typeof spreaderLoader !== 'undefined' && spreaderLoader) {
                 try {
                     await spreaderLoader.hide();
@@ -324,9 +323,6 @@ const Forms = {
                 }
             }
             this.showError(error.message);
-            
-            const loading = document.getElementById('loading');
-            if (loading) loading.classList.remove('show');
         }
     },
 
