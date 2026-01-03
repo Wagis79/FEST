@@ -5,7 +5,7 @@
  * Mockar Supabase-klienten för isolerade tester.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 // Mock Supabase innan vi importerar modulen
 vi.mock('@supabase/supabase-js', () => ({

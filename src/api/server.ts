@@ -50,7 +50,6 @@ import {
 dotenv.config();
 
 const app = express();
-const _PORT = process.env.PORT || 3000;
 
 // Trust proxy for Railway/production (needed for rate-limiting and X-Forwarded-For)
 if (process.env.NODE_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT) {

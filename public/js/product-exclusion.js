@@ -319,19 +319,6 @@ const ProductExclusion = {
      */
     closeModal() {
         document.getElementById('productModal').style.display = 'none';
-    },
-
-    /**
-     * Legacy-kompatibilitet: toggle (används av gamla onclick-handlers)
-     * @deprecated Använd setStatus() istället
-     */
-    toggle(productId, isChecked) {
-        // Konvertera gammalt beteende till nytt
-        if (isChecked) {
-            this.setStatus(productId, 'normal');
-        } else {
-            this.setStatus(productId, 'excluded');
-        }
     }
 };
 
@@ -346,10 +333,6 @@ function closeProductList() {
 
 function resetExcludedProducts() {
     ProductExclusion.resetAll();
-}
-
-function toggleProductExclusion(productId, isChecked) {
-    ProductExclusion.toggle(productId, isChecked);
 }
 
 function updateProductListButton() {
@@ -382,6 +365,5 @@ window.ProductExclusion = ProductExclusion;
 window.showProductList = showProductList;
 window.closeProductList = closeProductList;
 window.resetExcludedProducts = resetExcludedProducts;
-window.toggleProductExclusion = toggleProductExclusion;
 window.updateProductListButton = updateProductListButton;
 window.debugExcludedProducts = debugExcludedProducts;
