@@ -473,6 +473,42 @@ describe('POST /api/calculate-need', () => {
     }
   });
 
+  it('ska beräkna näringsbehov med förfrukt', async () => {
+    const response = await withApiKey(
+      request(app)
+        .post('/api/calculate-need')
+        .set('Accept', 'application/json')
+        .send({
+          cropId: 'hostevete',
+          yieldTonPerHa: 8,
+          precropId: 'klover'
+        })
+    );
+    
+    // 200 om grödorna finns, 404 om inte
+    if (response.status === 200) {
+      expect(response.body).toHaveProperty('success', true);
+      expect(response.body).toHaveProperty('need');
+      // Med förfrukt bör N-behovet potentiellt vara lägre
+      expect(response.body.need.N).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it('ska ge 404 för okänd gröda', async () => {
+    const response = await withApiKey(
+      request(app)
+        .post('/api/calculate-need')
+        .set('Accept', 'application/json')
+        .send({
+          cropId: 'nonexistent_crop_xyz',
+          yieldTonPerHa: 8
+        })
+    );
+    
+    expect(response.status).toBe(404);
+    expect(response.body).toHaveProperty('success', false);
+  });
+
 });
 
 // ============================================================================
@@ -878,6 +914,64 @@ describe('Admin Config Extended Operations', () => {
       }
     });
 
+  });
+
+});
+
+// ============================================================================
+// API KEY VALIDATION
+// ============================================================================
+
+describe('API Key Validation', () => {
+  
+  it('ska neka åtkomst med ogiltig API-nyckel', async () => {
+    const response = await request(app)
+      .get('/api/crops')
+      .set('X-API-Key', 'invalid-key-that-does-not-exist')
+      .set('Accept', 'application/json');
+    
+    expect(response.status).toBe(403);
+    expect(response.body.success).toBe(false);
+    expect(response.body.code).toBe('INVALID_API_KEY');
+  });
+
+  it('ska neka åtkomst utan API-nyckel för JSON-requests', async () => {
+    const response = await request(app)
+      .get('/api/crops')
+      .set('Accept', 'application/json');
+    
+    expect(response.status).toBe(401);
+    expect(response.body.success).toBe(false);
+    expect(response.body.code).toBe('MISSING_API_KEY');
+  });
+
+});
+
+// ============================================================================
+// ADMIN PASSWORD VALIDATION
+// ============================================================================
+
+describe('Admin Password Validation', () => {
+  
+  it('ska neka admin-åtkomst utan lösenord', async () => {
+    const response = await request(app)
+      .get('/api/admin/config')
+      .set('Accept', 'application/json');
+    
+    expect(response.status).toBe(403);
+    expect(response.body.success).toBe(false);
+    expect(response.body.error).toBe('Felaktigt admin-lösenord');
+  });
+
+  it('ska neka admin-åtkomst med felaktigt lösenord', async () => {
+    const response = await request(app)
+      .get('/api/admin/config')
+      .set('X-Admin-Password', 'wrong-password-123')
+      .set('Accept', 'application/json');
+    
+    expect(response.status).toBe(403);
+    expect(response.body.success).toBe(false);
+    expect(response.body.error).toBe('Felaktigt admin-lösenord');
   });
 
 });

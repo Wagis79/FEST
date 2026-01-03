@@ -20,6 +20,28 @@ import {
 } from '../../api/validation';
 import { z } from 'zod';
 
+// Mock helpers for Express Request/Response
+// We use explicit casts because mocking Express types fully is complex and not the focus of these tests
+interface MockRequest {
+  body: Record<string, unknown>;
+  query: Record<string, unknown>;
+  path: string;
+  validatedQuery?: Record<string, unknown>;
+}
+
+interface MockResponse {
+  status: ReturnType<typeof vi.fn>;
+  json: ReturnType<typeof vi.fn>;
+}
+
+function createMockReq(overrides: Partial<MockRequest> = {}): MockRequest {
+  return { path: '/test', body: {}, query: {}, ...overrides };
+}
+
+function createMockRes(): MockResponse {
+  return { status: vi.fn().mockReturnThis(), json: vi.fn() };
+}
+
 // ============================================================================
 // NUTRIENT NEED SCHEMA
 // ============================================================================
@@ -457,11 +479,11 @@ describe('validateBody middleware', () => {
 
   it('ska kalla next() för giltig body', () => {
     const middleware = validateBody(TestSchema);
-    const req = { body: { name: 'test', value: 42 }, path: '/test' } as any;
-    const res = { status: vi.fn().mockReturnThis(), json: vi.fn() } as any;
+    const req = createMockReq({ body: { name: 'test', value: 42 } });
+    const res = createMockRes();
     const next = vi.fn();
 
-    middleware(req, res, next);
+    middleware(req as unknown as Parameters<typeof middleware>[0], res as unknown as Parameters<typeof middleware>[1], next);
 
     expect(next).toHaveBeenCalled();
     // validateBody ersätter req.body med parsad data
@@ -470,11 +492,11 @@ describe('validateBody middleware', () => {
 
   it('ska ge 400 för ogiltig body', () => {
     const middleware = validateBody(TestSchema);
-    const req = { body: { name: '', value: -1 }, path: '/test' } as any;
-    const res = { status: vi.fn().mockReturnThis(), json: vi.fn() } as any;
+    const req = createMockReq({ body: { name: '', value: -1 } });
+    const res = createMockRes();
     const next = vi.fn();
 
-    middleware(req, res, next);
+    middleware(req as unknown as Parameters<typeof middleware>[0], res as unknown as Parameters<typeof middleware>[1], next);
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalled();
@@ -495,11 +517,11 @@ describe('validateQuery middleware', () => {
 
   it('ska kalla next() för giltig query', () => {
     const middleware = validateQuery(QuerySchema);
-    const req = { query: { page: '1', limit: '20' } } as any;
-    const res = { status: vi.fn().mockReturnThis(), json: vi.fn() } as any;
+    const req = createMockReq({ query: { page: '1', limit: '20' } });
+    const res = createMockRes();
     const next = vi.fn();
 
-    middleware(req, res, next);
+    middleware(req as unknown as Parameters<typeof middleware>[0], res as unknown as Parameters<typeof middleware>[1], next);
 
     expect(next).toHaveBeenCalled();
     expect(req.validatedQuery).toEqual({ page: 1, limit: 20 });
@@ -507,11 +529,11 @@ describe('validateQuery middleware', () => {
 
   it('ska ge 400 för ogiltiga query-parametrar', () => {
     const middleware = validateQuery(QuerySchema);
-    const req = { query: { page: '0', limit: '999' } } as any;
-    const res = { status: vi.fn().mockReturnThis(), json: vi.fn() } as any;
+    const req = createMockReq({ query: { page: '0', limit: '999' } });
+    const res = createMockRes();
     const next = vi.fn();
 
-    middleware(req, res, next);
+    middleware(req as unknown as Parameters<typeof middleware>[0], res as unknown as Parameters<typeof middleware>[1], next);
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalled();
